@@ -23,6 +23,7 @@ import Text.Printf
 import Text.RegexPR
 import Web.VKHS as VK hiding (api,api')
 import Web.VKHS.API.Monad as VK
+import Network.CURL730
 
 data Options = Options
   { verb :: Verbosity
@@ -125,7 +126,7 @@ cmd (Options v apid at pollint u pass) = run $ do
 
 
 main :: IO ()
-main = do
+main = withlib CURL730 $ do
   hSetBuffering stdout NoBuffering
   hSetBuffering stderr NoBuffering
   at <- fromMaybe [] <$> lookupEnv env_var_name

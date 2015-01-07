@@ -28,7 +28,7 @@ import qualified Data.Map as M
 import Data.Maybe
 import Data.Typeable
 
-import Network.Curlhs.Core
+import Network.CURL730
 import Network.Protocol.Http
 import Network.Protocol.Uri
 import Network.Protocol.Uri.Query
@@ -129,29 +129,29 @@ liftEIO act = (liftIO act) >>= either fail return
 -- | Send a get-request to the server
 vk_get :: Uri -> Cookies -> VK Page
 vk_get u c = let
-    c' = (VKHS.pack $ bw cookie $ map toShort $ bw gather c )
-    u' = (VKHS.pack $ showUri u)
+    c' = (bw cookie $ map toShort $ bw gather c )
+    u' = (showUri u)
     in do
         e <- ask
         s <- liftEIO $ vk_curl e $ do
-            when ((not . BS.null) c') $ do
+            when ((not . null) c') $ do
                 tell [CURLOPT_COOKIE c']
-            when ((not . BS.null) u') $ do
+            when ((not . null) u') $ do
                 tell [CURLOPT_URL u']
         liftVK (return $ parseResponse $ VKHS.unpack s)
 
 -- | Send a form to the server.
 vk_post :: FilledForm -> Cookies -> VK Page
 vk_post f c = let
-    c' = (VKHS.pack $ bw cookie $ map toShort $ bw gather c )
-    p' = (VKHS.pack $ bw params $ M.toList $ inputs f)
-    u' = (VKHS.pack $ action f)
+    c' = (bw cookie $ map toShort $ bw gather c )
+    p' = (bw params $ M.toList $ inputs f)
+    u' = (action f)
     in do
         e <- ask
         s <- liftEIO $ vk_curl e $ do
-            when ((not . BS.null) c') $ do
+            when ((not . null) c') $ do
                 tell [CURLOPT_COOKIE c']
-            when ((not . BS.null) u') $ do
+            when ((not . null) u') $ do
                 tell [CURLOPT_URL u']
             tell [CURLOPT_POST True]
             tell [CURLOPT_COPYPOSTFIELDS p']

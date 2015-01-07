@@ -17,7 +17,7 @@ import Control.Exception (catch,bracket)
 import Control.Concurrent (threadDelay)
 import Control.Monad.Writer
 
-import Network.Curlhs.Core
+import Network.CURL730
 
 import Prelude hiding (catch)
 
@@ -38,24 +38,25 @@ vk_curl e w = do
     d <- askE delay_ms
     do
         buff <- newIORef BS.empty
-        bracket (curl_easy_init) (curl_easy_cleanup) $ \curl -> do {
-            let 
-                memwrite n = atomicModifyIORef buff
-                    (\o -> (BS.append o n, CURL_WRITEFUNC_OK))
-            in
-            curl_easy_setopt curl $
-                [ CURLOPT_HEADER         True
-                , CURLOPT_WRITEFUNCTION (Just $ memwrite)
-                , CURLOPT_SSL_VERIFYPEER False
-                , CURLOPT_USERAGENT $ BS.pack $ map BS.c2w a
-                , CURLOPT_VERBOSE (v == Debug )
-                ] ++ (execWriter w);
-            curl_easy_perform curl;
-            threadDelay (1000 * d); -- convert ms to us
-            b <- readIORef buff ;
-            return (Right b) ;
+        do {
+          bracket (curl_easy_init) (curl_easy_cleanup) $ \curl ->
+              let 
+                  memwrite n = atomicModifyIORef buff
+                      (\o -> (BS.append o n, CURL_WRITEFUNC_OK))
+              in do
+              curl_easy_setopt curl $
+                  [ CURLOPT_HEADER         True
+                  , CURLOPT_WRITEFUNCTION (Just $ memwrite)
+                  , CURLOPT_SSL_VERIFYPEER False
+                  , CURLOPT_USERAGENT a
+                  , CURLOPT_VERBOSE (v == Debug )
+                  ] ++ (execWriter w);
+              curl_easy_perform curl;
+              threadDelay (1000 * d); -- convert ms to us
+              b <- readIORef buff ;
+              return (Right b) ;
         } `catch`
-            (\(e::CURLcode) -> return $ Left ("CURL error: " ++ (show e)))
+            (\(e::CURLE) -> return $ Left ("CURL error: " ++ (show e)))
 
 scanPattern pat s =
   let (_,o,x,n) = BS.foldl' check (False, BS.empty, BS.empty, BS.empty) s
@@ -122,9 +123,9 @@ vk_curl_file e url cb = do
                 [ CURLOPT_HEADER         True
                 , CURLOPT_WRITEFUNCTION (Just $ filewrite)
                 , CURLOPT_SSL_VERIFYPEER False
-                , CURLOPT_USERAGENT $ BS.pack $ map BS.c2w a
+                , CURLOPT_USERAGENT a
                 , CURLOPT_VERBOSE (v == Debug)
-                , CURLOPT_URL (BS.pack $ map BS.c2w url)
+                , CURLOPT_URL url
                 ]; 
 
             curl_easy_perform curl;
@@ -134,7 +135,7 @@ vk_curl_file e url cb = do
               Working _ -> return $ Right ()
               _         -> return $ Left "HTTP header detection failure"
         } `catch`
-            (\(e::CURLcode) -> return $ Left ("CURL error: " ++ (show e)))
+            (\(e::CURLE) -> return $ Left ("CURL error: " ++ (show e)))
 
 
 -- | Return HTTP payload, ignore headers
@@ -162,7 +163,7 @@ vk_curl_payload e w = do
                 [ CURLOPT_HEADER         True
                 , CURLOPT_WRITEFUNCTION (Just $ writer)
                 , CURLOPT_SSL_VERIFYPEER False
-                , CURLOPT_USERAGENT $ BS.pack $ map BS.c2w a
+                , CURLOPT_USERAGENT a
                 , CURLOPT_VERBOSE (v == Debug)
                 ] ++ (execWriter w); 
             curl_easy_perform curl;
@@ -172,5 +173,5 @@ vk_curl_payload e w = do
               Working _ -> return $ Right buff
               _         -> return $ Left "HTTP header detection failure"
         } `catch`
-            (\(e::CURLcode) -> return $ Left ("CURL error: " ++ (show e)))
+            (\(e::CURLE) -> return $ Left ("CURL error: " ++ (show e)))
 

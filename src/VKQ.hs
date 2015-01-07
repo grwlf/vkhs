@@ -26,6 +26,7 @@ import Web.VKHS
 import Web.VKHS.Curl
 import Web.VKHS.API.Aeson as A
 import Web.VKHS.API.Base as STR
+import Network.CURL730
 
 data Options = Options
   { verb :: Verbosity
@@ -161,7 +162,7 @@ checkRight (Left e) = hPutStrLn stderr e >> exitFailure
 checkRight (Right a) = return a
 
 main :: IO ()
-main = do
+main = withlib CURL730 $ do
   m <- maybe (idm) (value) <$> lookupEnv "VKQ_ACCESS_TOKEN"
   execParser (info (helper <*> opts m) (fullDesc <> header "Vkontakte social network tool")) >>= cmd
 

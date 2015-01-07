@@ -12,7 +12,7 @@ import Data.Label
 import qualified Data.ByteString.UTF8 as U
 import qualified Data.ByteString as BS
 
-import Network.Curlhs.Core
+import Network.CURL730
 
 import Network.Protocol.Http ()
 import Network.Protocol.Uri
@@ -40,6 +40,6 @@ api :: Env CallEnv
 api e mn mp =
   let uri = showUri $ (\f -> f $ toUri $ printf "https://api.vk.com/method/%s" mn) $
               set query $ bw params (("access_token",(access_token . sub) e):mp)
-  in vk_curl_payload e (tell [CURLOPT_URL $ U.fromString uri])
+  in vk_curl_payload e (tell [CURLOPT_URL uri])
 
 
