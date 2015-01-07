@@ -1,6 +1,6 @@
 
 name:                VKHS
-version:             0.5.2
+version:             0.5.3
 synopsis:            Provides access to Vkontakte social network via public API
 description:
     Provides access to Vkontakte API methods. Library requires no interaction
@@ -70,18 +70,18 @@ library
                      containers,
                      mtl,
                      bytestring,
-                     tagsoup-parsec ==0.0.*,
-                     tagsoup ==0.12.*,
-                     failure ==0.2.*,
+                     tagsoup-parsec,
+                     tagsoup,
+                     failure,
                      curlhs,
-                     safe ==0.3.*,
-                     parsec ==3.1.*,
-                     split ==0.2.*,
-                     utf8-string ==0.3.*,
-                     bimap ==0.2.*,
+                     safe,
+                     parsec,
+                     split,
+                     utf8-string,
+                     bimap,
                      template-haskell,
-                     transformers ==0.3.*,
-                     optparse-applicative,
+                     transformers,
+                     optparse-applicative ==0.11.*,
                      aeson,
                      filepath,
                      directory,

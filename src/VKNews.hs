@@ -70,7 +70,7 @@ opts at = Options
   <$> flag Normal Debug (long "verbose" <> help "Be verbose")
   <*> strOption (long "application-id" <> short 'a' <> value vkhs_app_id <> help (printf "Application ID (can be set via %s)" env_var_name))
   <*> strOption (long "access-token" <> short 't' <> value at <> help "Access token")
-  <*> option (long "poll-interval" <> short 'i' <> value 20 <> help "Poll interval [sec]")
+  <*> option auto (long "poll-interval" <> short 'i' <> value 20 <> help "Poll interval [sec]")
   <*> argument str (metavar "USERNAME" <> help "User name")
   <*> strOption (metavar "STR" <> long "password" <> short 'p' <> value "-" <> help "Password")
   -- <*> argument str (metavar "GROUPID" <> help "Vkontakte ID of the group to read the news from")
