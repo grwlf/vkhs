@@ -30,7 +30,7 @@ Here is an example session: Login first
     d785932b871f096bd73aac6a35d7a7c469dd788d796463a871e5beb5c61bc6c96788ec2 11229 32833
 
 VKQ returns three values. First is a access token which is required to execute
-future API requests. VKQ reads it from VKQ_ACCESS_TOKEN environment variable so
+future API requests. VKQ reads it from VKQ\_ACCESS\_TOKEN environment variable so
 we have to set it up
 
     $ export VKQ_ACCESS_TOKEN=d785932b871f096bd73aac6a35d7a7c469dd788d796463a871e5beb5c61bc6c96788ec2

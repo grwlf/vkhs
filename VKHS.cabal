@@ -1,6 +1,6 @@
 
 name:                VKHS
-version:             0.5.1
+version:             0.5.2
 synopsis:            Provides access to Vkontakte social network via public API
 description:
     Provides access to Vkontakte API methods. Library requires no interaction
@@ -14,11 +14,11 @@ copyright:           Copyright (c) 2012, Sergey Mironov
 category:            Web
 build-type:          Custom
 cabal-version:       >=1.6
-homepage:            http://github.com/ierton/vkhs
+homepage:            http://github.com/grwlf/vkhs
 
 source-repository head
     type:     git
-    location: https://github.com/ierton/vkhs.git
+    location: https://github.com/grwlf/vkhs.git
 
 executable vknews
   extra-libraries: curl
