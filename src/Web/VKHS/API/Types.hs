@@ -7,10 +7,10 @@ import Data.Data
 import Data.Time.Clock
 import Data.Time.Clock.POSIX
 
-data Response a = Response a
-  deriving(Show)
+newtype Response a = Response a
+  deriving (Show)
 
-data SizedList a = SL Int a
+data SizedList a = SL Int [a]
 
 data MusicRecord = MR
   { aid :: Int
@@ -32,7 +32,7 @@ data UserRecord = UR
   , faculty :: Maybe Int
   , faculty_name :: Maybe String
   , graduation :: Maybe Int
-  } deriving(Show,Data,Typeable)
+  } deriving (Show, Data, Typeable)
 
 data WallRecord = WR
   { wid :: Int
@@ -40,15 +40,13 @@ data WallRecord = WR
   , from_id :: Int
   , wtext :: String
   , wdate :: Int
-  } deriving(Show)
+  } deriving (Show)
 
 publishedAt :: WallRecord -> UTCTime
 publishedAt wr = posixSecondsToUTCTime $ fromIntegral $ wdate wr
 
-
 data RespError = ER
   { error_code :: Int
   , error_msg :: String
-  } deriving(Show)
-
+  } deriving (Show)
 

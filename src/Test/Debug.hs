@@ -1,6 +1,5 @@
 -- FIXME: in order debug to work
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 
@@ -12,9 +11,9 @@ import Control.Monad.Trans
 class Debug x where
     debug :: (MonadIO m) => x -> m ()
 
-instance (Show x) => Debug x where
+instance {-# OVERLAPPABLE #-} (Show x) => Debug x where
     debug = liftIO . putStrLn . show . show
 
-instance Debug String where
+instance {-# OVERLAPPING #-} Debug String where
     debug = liftIO . putStrLn . show
 
