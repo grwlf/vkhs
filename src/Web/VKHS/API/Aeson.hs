@@ -48,7 +48,7 @@ instance FromJSON MusicRecord where
   parseJSON = parseGeneric
 
 instance FromJSON WallRecord where
-  parseJSON (Object o) = 
+  parseJSON (Object o) =
     WR <$> (o .: "id")
        <*> (o .: "to_id")
        <*> (o .: "from_id")
@@ -56,7 +56,7 @@ instance FromJSON WallRecord where
        <*> (o .: "date")
   parseJSON o = parseJSON_obj_error "WallRecord" o
 
-instance (FromJSON a) => FromJSON (SizedList [a]) where
+instance (FromJSON a) => FromJSON (SizedList a) where
   parseJSON (A.Array v) = do
     n <- A.parseJSON (V.head v)
     t <- A.parseJSON (A.Array (V.tail v))

@@ -195,10 +195,10 @@ cmd (Options v (Music (MO act _ q@(_:_) fmt _ _ _ _))) = do
     printf "%s\n" (mr_format fmt m)
   printf "total %d\n" len
 
--- List audio files 
+-- List audio files
 cmd (Options v (Music (MO act True [] fmt _ _ _ _))) = do
   let e = (envcall act) { verbose = v }
-  (Response ms) <- api_ e "audio.get" []
+  Response (ms :: [MusicRecord]) <- api_ e "audio.get" []
   forM_ ms $ \m -> do
     printf "%s\n" (mr_format fmt m)
 cmd (Options _ (Music (MO _ False [] _ _ _ [] _))) = do
@@ -207,7 +207,7 @@ cmd (Options _ (Music (MO _ False [] _ _ _ [] _))) = do
 -- Download audio files
 cmd (Options v (Music (MO act False [] _ ofmt odir rid sk))) = do
   let e = (envcall act) { verbose = v }
-  Response ms <- api_ e "audio.getById" [("audios", concat $ intersperse "," rid)]
+  Response (ms :: [MusicRecord]) <- api_ e "audio.getById" [("audios", concat $ intersperse "," rid)]
   forM_ ms $ \m -> do
     (fp, mh) <- openFileMR odir sk ofmt m
     case mh of
@@ -252,7 +252,7 @@ openFileMR dir sk fmt m = do
   let (_,ext) = splitExtension (url m)
   let name = mr_format fmt m
   let name' = replaceExtension name (takeWhile (/='?') ext)
-  let fp =  (dir </> name') 
+  let fp =  (dir </> name')
   e <- doesFileExist fp
   case (e && sk) of
     True -> do

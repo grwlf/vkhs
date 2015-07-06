@@ -176,7 +176,7 @@ derive makeLabel signatures concrete tyname vars total ((field, _, fieldtyp), ct
     record rec fld val = val >>= \v -> recUpdE rec [return (fld, v)]
 
     -- Build a function declaration with both a type signature and body.
-    function (s, b) = liftM2 (,) 
+    function (s, b) = liftM2 (,)
         (sigD labelName s)
         (funD labelName [ clause [] (normalB b) [] ])
 
@@ -195,15 +195,11 @@ prettyTyVar (PlainTV  tv   ) = PlainTV (prettyName tv)
 prettyTyVar (KindedTV tv ki) = KindedTV (prettyName tv) ki
 
 prettyType :: Type -> Type
-prettyType (ForallT xs cx ty) = ForallT (map prettyTyVar xs) (map prettyPred cx) (prettyType ty)
+prettyType (ForallT xs cx ty) = ForallT (map prettyTyVar xs) (map prettyType cx) (prettyType ty)
 prettyType (VarT nm         ) = VarT (prettyName nm)
 prettyType (AppT ty tx      ) = AppT (prettyType ty) (prettyType tx)
 prettyType (SigT ty ki      ) = SigT (prettyType ty) ki
 prettyType ty                 = ty
-
-prettyPred :: Pred -> Pred
-prettyPred (ClassP nm tys) = ClassP (prettyName nm) (map prettyType tys)
-prettyPred (EqualP ty tx ) = EqualP (prettyType ty) (prettyType tx)
 
 -- IsString instances for TH types.
 

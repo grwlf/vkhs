@@ -104,7 +104,7 @@ $(mkLabels [''Cookie])
 
 -- | Short notation for cookies
 
-data CookieShort = 
+data CookieShort =
   CookieShort
     { _s_name  :: String
     , _s_value   :: String
@@ -158,10 +158,10 @@ showSetCookie c =
 infixr 0 !$
 
 parseSetCookie :: String -> Cookie
-parseSetCookie s = 
+parseSetCookie s =
   let p = fw (keyValues ";" "=") s
   in Cookie
-    { _name       = p !$ headMay >>> fmap fst >>> fromMaybe "" 
+    { _name       = p !$ headMay >>> fmap fst >>> fromMaybe ""
     , _value      = p !$ headMay >>> fmap snd >>> fromMaybe ""
     , _comment    = p !$ lookup "comment"
     , _commentURL = p !$ lookup "commentURL"
