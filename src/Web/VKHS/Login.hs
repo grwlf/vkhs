@@ -42,7 +42,7 @@ import System.IO
 import Web.VKHS.Types
 import Web.VKHS.Curl as VKHS
 
--- Test applications: 
+-- Test applications:
 --
 -- pirocheck
 -- ID 3115622
@@ -61,8 +61,8 @@ type Body = String
 toarg :: [AccessRight] -> String
 toarg = intercalate "," . map (map toLower . show)
 
--- | Gathers login information into Env data set. 
-env :: String 
+-- | Gathers login information into Env data set.
+env :: String
     -- ^ Client ID (provided by VKontakte, also known as application ID)
     -> String
     -- ^ User email, able to authenticate the user
@@ -71,7 +71,7 @@ env :: String
     -> [AccessRight]
     -- ^ Access rights to request
     -> Env LoginEnv
-env cid email pwd ar = mkEnv 
+env cid email pwd ar = mkEnv
   (LoginEnv
     [ ("email",email) , ("pass",pwd) ]
     ar
@@ -80,11 +80,11 @@ env cid email pwd ar = mkEnv
 
 vk_start_action :: ClientId -> [AccessRight] -> ActionHist
 vk_start_action cid ac = AH [] $ OpenUrl start_url mempty where
-    start_url = (\f -> f $ toUri "http://oauth.vk.com/authorize") 
+    start_url = (\f -> f $ toUri "https://oauth.vk.com/authorize")
         $ set query $ bw params
             [ ("client_id",     cid)
             , ("scope",         toarg ac)
-            , ("redirect_uri",  "http://oauth.vk.com/blank.html")
+            , ("redirect_uri",  "https://oauth.vk.com/blank.html")
             , ("display",       "wap")
             , ("response_type", "token")
             ]
@@ -156,7 +156,7 @@ vk_post f c = let
             tell [CURLOPT_POST True]
             tell [CURLOPT_COPYPOSTFIELDS p']
         liftVK (return $ parseResponse $ VKHS.unpack s)
-    
+
 -- | Splits parameters into 3 categories:
 -- 1)without a value, 2)filled from user dictionary, 3)with default values
 split_inputs :: [(String,String)]
@@ -218,8 +218,8 @@ vk_analyze hist ((h,b),c)
         a = uri_fragment h
 
 vk_dump_page :: Int -> Uri -> Page -> IO ()
-vk_dump_page n u (h,b) 
-  | (>0) . length . filter (isAlpha) $ b = 
+vk_dump_page n u (h,b)
+  | (>0) . length . filter (isAlpha) $ b =
     let name = printf "%02d-%s.html" n (showAuthority (get authority u))
     in bracket (openFile name WriteMode) (hClose) $ \f -> do
         hPutStrLn f b
@@ -228,8 +228,8 @@ vk_dump_page n u (h,b)
 
 -- | Execute login procedure, return (Right AccessToken) on success
 login :: Env LoginEnv -> IO (Either String AccessToken)
-login e@(Env (LoginEnv _ acr cid) _ _ _) = 
-  runVK e $ loop [0..] (vk_start_action cid acr) where 
+login e@(Env (LoginEnv _ acr cid) _ _ _) =
+  runVK e $ loop [0..] (vk_start_action cid acr) where
     loop (n:ns) (AH h act) = do
         when_trace $ printf "VK => %02d %s" n (show act)
         ans@(p,c) <- vk_move act
