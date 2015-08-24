@@ -51,7 +51,7 @@ allAccess =
   , Notifications
   , Stats
   -- , Ads
-  -- , Offline
+  , Offline
   ]
 
 -- See API docs http://vk.com/developers.php?oid=-1&p=Права_доступа_приложений (in
@@ -61,7 +61,8 @@ allAccess =
 data Verbosity = Normal | Trace | Debug
   deriving(Enum,Eq,Ord,Show)
 
-type ClientId = String
+type ClientId     = String
+type ClientSecret = String
 
 data LoginEnv = LoginEnv
   { formdata :: [(String,String)]
@@ -70,6 +71,8 @@ data LoginEnv = LoginEnv
   -- ^ Access rights, required by later API calls
   , clientId :: ClientId
   -- ^ Application ID provided by vk.com
+  , clientSecret :: ClientSecret
+  -- ^ Application secret code provided by vk.com
   } deriving(Show)
 
 data CallEnv = CallEnv
