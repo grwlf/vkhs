@@ -20,20 +20,9 @@ source-repository head
     type:     git
     location: https://github.com/grwlf/vkhs.git
 
-executable vknews
-  extra-libraries: curl
-  hs-source-dirs:    src
-  main-is:           VKNews.hs
-  build-tools:     hsc2hs
-  ghc-options:     -Wall -fwarn-tabs
-
-executable vkq
-  hs-source-dirs:    src
-  main-is:           VKQ.hs
-
 library
   hs-source-dirs:    src
-  other-modules:     Test.Debug, Test.Data, Test.API, Network.Shpider.Forms,
+  other-modules:     Network.Shpider.Forms,
     Network.Protocol.Uri, Network.Protocol.Mime, Network.Protocol.Http,
     Network.Protocol.Cookie, Network.Protocol.Uri.Remap,
     Network.Protocol.Uri.Query, Network.Protocol.Uri.Printer,
@@ -74,6 +63,7 @@ library
                      tagsoup,
                      failure,
                      curlhs,
+                     http-conduit,
                      safe,
                      parsec,
                      split,

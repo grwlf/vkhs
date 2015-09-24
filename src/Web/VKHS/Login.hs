@@ -1,8 +1,11 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Web.VKHS.Login
     ( login
     , env
+    , getUserAccessTokenStep1
+    , getUserAccessTokenStep2
     ) where
 
 import Prelude hiding ((.), id, catch)
@@ -35,6 +38,9 @@ import Network.Protocol.Uri.Query
 import Network.Protocol.Cookie as C
 import Network.Shpider.Forms
 
+import Network.HTTP.Conduit hiding (Response)
+import Data.Aeson as Aes
+
 import Text.HTML.TagSoup
 import Text.Printf
 import System.IO
@@ -42,7 +48,7 @@ import System.IO
 import Web.VKHS.Types
 import Web.VKHS.Curl as VKHS
 
--- Test applications: 
+-- Test applications:
 --
 -- pirocheck
 -- ID 3115622
@@ -61,9 +67,11 @@ type Body = String
 toarg :: [AccessRight] -> String
 toarg = intercalate "," . map (map toLower . show)
 
--- | Gathers login information into Env data set. 
-env :: String 
+-- | Gathers login information into Env data set.
+env :: String
     -- ^ Client ID (provided by VKontakte, also known as application ID)
+    -> String
+    -- ^ Client secret
     -> String
     -- ^ User email, able to authenticate the user
     -> String
@@ -71,20 +79,21 @@ env :: String
     -> [AccessRight]
     -- ^ Access rights to request
     -> Env LoginEnv
-env cid email pwd ar = mkEnv 
+env cid csec email pwd ar = mkEnv
   (LoginEnv
     [ ("email",email) , ("pass",pwd) ]
     ar
     cid
+    csec
   )
 
 vk_start_action :: ClientId -> [AccessRight] -> ActionHist
 vk_start_action cid ac = AH [] $ OpenUrl start_url mempty where
-    start_url = (\f -> f $ toUri "http://oauth.vk.com/authorize") 
+    start_url = (\f -> f $ toUri "https://oauth.vk.com/authorize")
         $ set query $ bw params
             [ ("client_id",     cid)
             , ("scope",         toarg ac)
-            , ("redirect_uri",  "http://oauth.vk.com/blank.html")
+            , ("redirect_uri",  "https://oauth.vk.com/blank.html")
             , ("display",       "wap")
             , ("response_type", "token")
             ]
@@ -156,7 +165,7 @@ vk_post f c = let
             tell [CURLOPT_POST True]
             tell [CURLOPT_COPYPOSTFIELDS p']
         liftVK (return $ parseResponse $ VKHS.unpack s)
-    
+
 -- | Splits parameters into 3 categories:
 -- 1)without a value, 2)filled from user dictionary, 3)with default values
 split_inputs :: [(String,String)]
@@ -218,8 +227,8 @@ vk_analyze hist ((h,b),c)
         a = uri_fragment h
 
 vk_dump_page :: Int -> Uri -> Page -> IO ()
-vk_dump_page n u (h,b) 
-  | (>0) . length . filter (isAlpha) $ b = 
+vk_dump_page n u (h,b)
+  | (>0) . length . filter (isAlpha) $ b =
     let name = printf "%02d-%s.html" n (showAuthority (get authority u))
     in bracket (openFile name WriteMode) (hClose) $ \f -> do
         hPutStrLn f b
@@ -228,8 +237,8 @@ vk_dump_page n u (h,b)
 
 -- | Execute login procedure, return (Right AccessToken) on success
 login :: Env LoginEnv -> IO (Either String AccessToken)
-login e@(Env (LoginEnv _ acr cid) _ _ _) = 
-  runVK e $ loop [0..] (vk_start_action cid acr) where 
+login e@(Env (LoginEnv _ acr cid _) _ _ _) =
+  runVK e $ loop [0..] (vk_start_action cid acr) where
     loop (n:ns) (AH h act) = do
         when_trace $ printf "VK => %02d %s" n (show act)
         ans@(p,c) <- vk_move act
@@ -241,3 +250,50 @@ login e@(Env (LoginEnv _ acr cid) _ _ _) =
             Left at -> do
                 return at
 
+type RedirectUrl = String
+
+getUserAccessTokenStep1 :: Env LoginEnv -> RedirectUrl -> IO (String)
+getUserAccessTokenStep1 e@(Env (LoginEnv _ perms cid _) _ _ _) redirectUrl = do
+  return $ concat $ urlBase
+         : cid
+         : "&response_type=code"
+         : "&display=page"
+         : "&redirect_uri="
+         : redirectUrl
+         : ( case perms of
+                [] -> []
+                _  -> pure $ "&scope=" ++ (toarg perms)
+           )
+  where
+    urlBase = "https://oauth.vk.com/authorize?client_id="
+
+data AccessTok = AccessTok { access_token :: String
+                           , expires_in :: Int
+                           , user_id :: Int
+                           }
+instance FromJSON AccessTok where
+    parseJSON (Object v) = AccessTok <$>
+                           v .: "access_token" <*>
+                           v .: "expires_in" <*>
+                           v .: "user_id"
+    parseJSON _          = mzero
+
+type Code = String
+
+getUserAccessTokenStep2 :: Env LoginEnv -> RedirectUrl -> Code -> IO (Either String AccessToken)
+getUserAccessTokenStep2 e@(Env (LoginEnv _ _ cid csec) _ _ _) redirectUrl code =
+  do
+    mAt <- simpleHttp requestUrl >>= return . (\v -> (Aes.decode v) :: Maybe AccessTok)
+    case mAt of
+        Just (AccessTok at ex uid) ->return $ Right (at, show uid, show ex)
+        Nothing -> return $ Left "Something went wrong. Check your code."
+  where
+    urlBase = "https://oauth.vk.com/access_token?client_id="
+    requestUrl = concat $ urlBase
+                    : cid
+                    : "&client_secret="
+                    : csec
+                    : "&redirect_uri="
+                    : redirectUrl
+                    : "&code="
+                    : [code]
