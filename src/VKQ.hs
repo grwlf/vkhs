@@ -6,6 +6,7 @@
 module Main where
 
 import Control.Monad
+import Control.Exception (SomeException(..),catch,bracket)
 import Data.Aeson as A
 import Data.Label.Abstract
 import Data.List
@@ -165,6 +166,9 @@ main :: IO ()
 main = withlib CURL730 $ do
   m <- maybe (idm) (value) <$> lookupEnv "VKQ_ACCESS_TOKEN"
   execParser (info (helper <*> opts m) (fullDesc <> header "Vkontakte social network tool")) >>= cmd
+  `catch` (\(e::SomeException) -> do
+    putStrLn $ (show e)
+    putStrLn $ "NOTE: make sure that libcurl.so is accessible (e.g. by setting LD_LIBRARY_PATH variable)" )
 
 cmd :: Options -> IO ()
 

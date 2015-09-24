@@ -40,7 +40,7 @@ vk_curl e w = do
         buff <- newIORef BS.empty
         do {
           bracket (curl_easy_init) (curl_easy_cleanup) $ \curl ->
-              let 
+              let
                   memwrite n = atomicModifyIORef buff
                       (\o -> (BS.append o n, CURL_WRITEFUNC_OK))
               in do
@@ -61,10 +61,10 @@ vk_curl e w = do
 scanPattern pat s =
   let (_,o,x,n) = BS.foldl' check (False, BS.empty, BS.empty, BS.empty) s
   in (BS.reverse o, x, BS.reverse n)
-  where 
+  where
     check (False, old, st, new) b
       | BS.length st < BS.length pat = (False, old, st`BS.snoc`b, new)
-      | st == pat                    = (True, old, st, b`BS.cons`new) 
+      | st == pat                    = (True, old, st, b`BS.cons`new)
       | otherwise                    = (False, (BS.head st)`BS.cons`old, (BS.tail st)`BS.snoc`b, new)
     check (True, old, st, new) b     = (True, old, st, b`BS.cons`new)
 
@@ -109,7 +109,7 @@ vk_curl_file e url cb = do
         sr <- newIORef =<< (Pending <$> pure BS.empty)
 
         bracket (curl_easy_init) (curl_easy_cleanup) $ \curl -> do {
-            let 
+            let
             filewrite bs = do
               s' <- atomicModifyIORef sr (\s -> let s' = process s bs in (s',s'))
               case s' of
@@ -117,7 +117,7 @@ vk_curl_file e url cb = do
                 Pending b -> return CURL_WRITEFUNC_OK
                 Working t -> do
                   cb t
-                  return CURL_WRITEFUNC_OK 
+                  return CURL_WRITEFUNC_OK
             in
               curl_easy_setopt curl $
                 [ CURLOPT_HEADER         True
@@ -126,7 +126,7 @@ vk_curl_file e url cb = do
                 , CURLOPT_USERAGENT a
                 , CURLOPT_VERBOSE (v == Debug)
                 , CURLOPT_URL url
-                ]; 
+                ];
 
             curl_easy_perform curl;
             threadDelay (1000 * d); -- convert ms to us
@@ -149,9 +149,9 @@ vk_curl_payload e w = do
         sr <- newIORef (BS.empty, Pending BS.empty)
 
         bracket (curl_easy_init) (curl_easy_cleanup) $ \curl -> do {
-            let 
+            let
             writer bs = do
-              atomicModifyIORef sr (\(buff,s) -> let s' = process s bs ; paired x =(x,x) in 
+              atomicModifyIORef sr (\(buff,s) -> let s' = process s bs ; paired x =(x,x) in
                 case s' of
                   FailNoHeader -> paired (buff,s')
                   Pending b -> paired (buff,s')
@@ -165,7 +165,7 @@ vk_curl_payload e w = do
                 , CURLOPT_SSL_VERIFYPEER False
                 , CURLOPT_USERAGENT a
                 , CURLOPT_VERBOSE (v == Debug)
-                ] ++ (execWriter w); 
+                ] ++ (execWriter w);
             curl_easy_perform curl;
             threadDelay (1000 * d); -- convert ms to us
             (buff,s) <- readIORef sr;
