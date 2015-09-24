@@ -114,7 +114,7 @@ opts m =
         <> help "FileName format, supported tags: %i %o %a %t %d %u"
         )
       <*> strOption (metavar "DIR" <> short 'o' <> help "Output directory" <> value "")
-      <*> some (argument str (metavar "RECORD_ID" <> help "Download records"))
+      <*> many (argument str (metavar "RECORD_ID" <> help "Download records"))
       <*> flag False True (long "skip-existing" <> help "Don't download existing files")
       ))
       ( progDesc "List or download music files"))
