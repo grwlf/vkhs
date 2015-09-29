@@ -14,7 +14,7 @@ import Control.Monad.Error
 
 import Data.Aeson as A
 import Data.Aeson.Types as A
-import Data.Aeson.Generic as AG
+import Data.Aeson.Parser as AG
 import Data.ByteString.Lazy as BS
 import Data.Data
 import Data.Vector as V (head, tail)
@@ -38,9 +38,9 @@ instance (FromJSON a) => FromJSON (Response a) where
     return (Response x)
   parseJSON o = parseJSON_obj_error "Response" o
 
-parseGeneric :: (Data a) => A.Value -> A.Parser a
+parseGeneric :: (FromJSON a,Data a) => A.Value -> A.Parser a
 parseGeneric val =
-  case AG.fromJSON val of
+  case A.fromJSON val of
     A.Success a -> return a
     A.Error s -> fail $ "parseGeneric fails:" ++ s
 
