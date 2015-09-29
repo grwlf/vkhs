@@ -1,6 +1,6 @@
 
 name:                VKHS
-version:             0.5.6
+version:             0.5.7
 synopsis:            Provides access to Vkontakte social network via public API
 description:
     Provides access to Vkontakte API methods. Library requires no interaction
@@ -81,7 +81,7 @@ library
                      bimap,
                      template-haskell,
                      transformers,
-                     optparse-applicative ==0.11.*,
+                     optparse-applicative,
                      aeson,
                      filepath,
                      directory,
