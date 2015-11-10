@@ -1,5 +1,7 @@
 module Web.VKHS2.Types where
 
+import Data.List
+import Data.Char
 
 -- | AccessToken is a authentication data, required by all VK API
 -- functions. It is a tuple of access_token, user_id, expires_in fields,
@@ -35,6 +37,10 @@ data AccessRight
   | Offline -- Доступ к API в любое время со стороннего сервера.
   deriving(Show, Eq, Ord, Enum)
 
+toUrlArg :: [AccessRight] -> String
+toUrlArg = intercalate "," . map (map toLower . show)
+
+
 allAccess :: [AccessRight]
 allAccess =
   [
@@ -58,6 +64,6 @@ allAccess =
   -- , Offline
   ]
 
-newtype ClientID = ClientID String
+newtype ClientID = ClientID { cid_string :: String }
   deriving(Show, Eq, Ord)
 
