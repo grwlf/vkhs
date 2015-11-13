@@ -6,6 +6,7 @@ module Web.VKHS2 where
 import Control.Applicative
 import Control.Monad
 import Control.Monad.State
+import Control.Monad.Cont
 
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -43,6 +44,8 @@ defaultState = LoginState allAccess (ClientID "0") []
 newtype LoginT m a = LoginT { unLogin :: StateT LoginState m a }
   deriving(Functor, Applicative, Monad, MonadState LoginState, MonadIO)
 
+
+
 -- FIXME: protect MonadIO instance
 runLogin s l = withOpenSSL (runStateT (unLogin l) s)
 
@@ -76,6 +79,31 @@ actionRequest (DoGET url cookies) = do
     http GET url
     when (not (null cookies)) $ do
       setHeader "Cookie" (renderCookiesText' cookies)
+
+
+newtype VKT_ r m a = VKT_ { unVK :: ContT r (LoginT m) a }
+  deriving(Functor, Applicative, Monad, MonadCont, MonadState LoginState)
+
+liftCont :: ((a -> LoginT m r) -> LoginT m r) -> VKT_ r m a
+liftCont f = VKT_ (ContT f)
+
+data VKResult m =
+    VKFine
+  | VKUnexpected (VKT m (VKResult m))
+
+type VKT m a = VKT_ (VKResult m) m a
+
+raiseError :: (Monad m) => VKT m (VKResult m)
+raiseError = liftCont $ \next -> do
+  return (VKUnexpected (liftCont $ \next' -> next VKFine >>= next' ))
+
+
+do_login :: VKT IO ()
+do_login = do
+  undefined
+
+
+{- Test -}
 
 test_login :: (MonadIO m) => LoginT m ()
 test_login = do
