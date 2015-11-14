@@ -44,6 +44,8 @@ defaultState = LoginState allAccess (ClientID "0") []
 newtype LoginT m a = LoginT { unLogin :: StateT LoginState m a }
   deriving(Functor, Applicative, Monad, MonadState LoginState, MonadIO)
 
+liftLogin :: (Monad m) => m a -> LoginT m a
+liftLogin = LoginT . lift
 
 
 -- FIXME: protect MonadIO instance
@@ -87,20 +89,30 @@ newtype VKT_ r m a = VKT_ { unVK :: ContT r (LoginT m) a }
 liftCont :: ((a -> LoginT m r) -> LoginT m r) -> VKT_ r m a
 liftCont f = VKT_ (ContT f)
 
-data VKResult m =
-    VKFine
-  | VKUnexpected (VKT m (VKResult m))
+data VKResult m a =
+    VKFine a
+  | VKUnexpected (a -> VKT m a)
 
-type VKT m a = VKT_ (VKResult m) m a
+type VKT m a = VKT_ (VKResult m a) m a
 
-raiseError :: (Monad m) => VKT m (VKResult m)
-raiseError = liftCont $ \next -> do
-  return (VKUnexpected (liftCont $ \next' -> next VKFine >>= next' ))
-
+raiseError :: (Monad m) => VKT m a
+raiseError = liftCont (\cont -> do
+  return (VKUnexpected (\x -> liftCont (\cont' -> do
+    res <- cont x
+    case res of
+      VKFine a -> cont' a
+      x -> return x))))
 
 do_login :: VKT IO ()
 do_login = do
   undefined
+
+loop :: (Monad m) => LoginT m a -> VKT m a -> LoginT m a
+loop fixer m = do
+  res <- runContT (unVK m) (return . VKFine)
+  case res of
+    VKFine x -> return x
+    VKUnexpected cont -> fixer >>= loop fixer . cont
 
 
 {- Test -}
