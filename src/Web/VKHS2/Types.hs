@@ -64,6 +64,6 @@ allAccess =
   -- , Offline
   ]
 
-newtype ClientID = ClientID { cid_string :: String }
+newtype AppID = AppID { aid_string :: String }
   deriving(Show, Eq, Ord)
 

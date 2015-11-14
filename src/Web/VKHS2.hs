@@ -32,24 +32,25 @@ import Web.VKHS2.Types
 data LoginState = LoginState {
     ls_rights :: [AccessRight]
   -- ^ Access rights to be requested
-  , ls_clientId :: ClientID
+  , ls_appid :: AppID
   -- ^ Application ID provided by vk.com
   , ls_formdata :: [(String,String)]
   -- ^ Dictionary containig inputID/value map for filling forms
   } deriving (Show)
 
-defaultState = LoginState allAccess (ClientID "0") []
+defaultState = LoginState allAccess (AppID "3128877") []
 
 
 newtype LoginT m a = LoginT { unLogin :: StateT LoginState m a }
   deriving(Functor, Applicative, Monad, MonadState LoginState, MonadIO)
 
+-- FIXME: protect MonadIO instance
+-- runLogin :: (Monad m) => LoginT m a -> m a
+runLogin l = withOpenSSL (runStateT (unLogin l) defaultState)
+
 liftLogin :: (Monad m) => m a -> LoginT m a
 liftLogin = LoginT . lift
 
-
--- FIXME: protect MonadIO instance
-runLogin s l = withOpenSSL (runStateT (unLogin l) s)
 
 newtype Url = Url String
   deriving(Show,Eq,Ord)
@@ -64,7 +65,7 @@ initialAction = do
   LoginState{..} <- get
   return $ DoGET (serializeRelativeRef' (
     RelativeRef Nothing "/authorize" (Query [
-        ("client_id", BS.pack (cid_string ls_clientId))
+        ("client_id", BS.pack (aid_string ls_appid))
       , ("scope", BS.pack (toUrlArg ls_rights))
       , ("redirect_url", "https://oauth.vk.com/blank.html")
       , ("display", "wap")
@@ -126,12 +127,12 @@ test_login = do
   a <- initialAction
   r <- actionRequest a
   liftIO $ do
-    putStrLn "1"
     ctx <- baselineContextSSL
     c <- openConnectionSSL ctx "oauth.vk.com" 443
     sendRequest c r emptyBody
-    receiveResponse c (\p i -> do
-      Streams.connect i stdout)
+    receiveResponse c (\h b -> do
+      -- putStrLn (show h)
+      Streams.connect b stdout)
     closeConnection c
 
 test = serializeRelativeRef' $ RelativeRef {
