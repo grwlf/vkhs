@@ -89,33 +89,37 @@ newtype VKT_ r m a = VKT_ { unVK :: ContT r (LoginT m) a }
 liftCont :: ((a -> LoginT m r) -> LoginT m r) -> VKT_ r m a
 liftCont f = VKT_ (ContT f)
 
+data Error = ETimeout
+  deriving(Show, Eq, Ord)
+
 data VKResult m a =
     VKFine a
-  | VKUnexpected (a -> VKT m a)
+  | VKUnexpected Error (a -> VKT m a)
 
 type VKT m a = VKT_ (VKResult m a) m a
 
-raiseError :: (Monad m) => VKT m a
-raiseError = liftCont (\cont -> do
-  return (VKUnexpected (\x -> liftCont (\cont' -> do
+raiseError :: (Monad m) => Error -> VKT m a
+raiseError e = liftCont (\cont -> do
+  return (VKUnexpected e (\x -> liftCont (\cont' -> do
     res <- cont x
     case res of
       VKFine a -> cont' a
       x -> return x))))
 
-do_login :: VKT IO ()
-do_login = do
-  undefined
-
-loop :: (Monad m) => LoginT m a -> VKT m a -> LoginT m a
-loop fixer m = do
-  res <- runContT (unVK m) (return . VKFine)
-  case res of
-    VKFine x -> return x
-    VKUnexpected cont -> fixer >>= loop fixer . cont
+-- do_login :: VKT IO ()
+-- do_login = do
+--   undefined
 
 
 {- Test -}
+
+test_loop :: (Monad m) => (Error -> LoginT m a) -> VKT m a -> LoginT m a
+test_loop fixer m = do
+  res <- runContT (unVK m) (return . VKFine)
+  case res of
+    VKFine x -> return x
+    VKUnexpected err cont -> fixer err >>= test_loop fixer . cont
+
 
 test_login :: (MonadIO m) => LoginT m ()
 test_login = do
