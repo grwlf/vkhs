@@ -33,12 +33,14 @@ library
                      containers,
                      mtl,
                      bytestring,
-                     http-streams,
-                     cookie,
-                     HsOpenSSL,
-                     blaze-builder,
-                     io-streams,
-                     attoparsec
+                     http-client,
+                     http-client-tls,
+                     network-uri,
+                     pipes,
+                     pipes-http,
+                     time,
+                     exceptions,
+                     data-default-class
 
 
 executable vkq

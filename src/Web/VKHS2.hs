@@ -3,30 +3,43 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Web.VKHS2 where
 
+import Data.List
+import Data.Maybe
+import Data.Time
+import Data.Either
 import Control.Applicative
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Cont
+import Control.Monad.Catch
+import Data.Default.Class
 
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 
-import System.IO.Streams (InputStream, OutputStream, stdout)
-import qualified System.IO.Streams as Streams
-import Network.Http.Client hiding (get)
+-- import System.IO.Streams (InputStream, OutputStream, stdout)
+-- import qualified System.IO.Streams as Streams
+import Network.HTTP.Client hiding (get)
+import Network.HTTP.Client.Internal (setUri)
+import Network.HTTP.Client.TLS
+import Network.URI
 
-import URI.ByteString (URI, RelativeRef, parseURI, strictURIParserOptions)
-import URI.ByteString
-import qualified URI.ByteString as URI
+-- import URI.ByteString (URI, RelativeRef, parseURI, strictURIParserOptions)
+-- import URI.ByteString
+-- import qualified URI.ByteString as URI
 
-import qualified Blaze.ByteString.Builder           as BB
-import qualified Blaze.ByteString.Builder.Char.Utf8 as BB
+-- import qualified Blaze.ByteString.Builder           as BB
+-- import qualified Blaze.ByteString.Builder.Char.Utf8 as BB
 
-import OpenSSL (withOpenSSL)
-import qualified OpenSSL as SSL
-import qualified OpenSSL.Session as SSL
+import Pipes.Prelude as PP  (foldM)
+import Pipes (for, runEffect, (>->))
+import Pipes.HTTP
 
-import Web.Cookie
+-- import OpenSSL (withOpenSSL)
+-- import qualified OpenSSL as SSL
+-- import qualified OpenSSL.Session as SSL
+
+-- import Web.Cookie
 import Web.VKHS2.Types
 
 data LoginState = LoginState {
@@ -46,7 +59,8 @@ newtype LoginT m a = LoginT { unLogin :: StateT LoginState m a }
 
 -- FIXME: protect MonadIO instance
 -- runLogin :: (Monad m) => LoginT m a -> m a
-runLogin l = withOpenSSL (runStateT (unLogin l) defaultState)
+-- runLogin l = withOpenSSL (runStateT (unLogin l) defaultState)
+runLogin l = (runStateT (unLogin l) defaultState)
 
 liftLogin :: (Monad m) => m a -> LoginT m a
 liftLogin = LoginT . lift
@@ -56,32 +70,36 @@ newtype Url = Url String
   deriving(Show,Eq,Ord)
 
 
-data RobotAction = DoGET ByteString CookiesText | DoPOST
-  deriving(Show,Eq,Ord)
+data RobotAction = DoGET URI CookieJar | DoPOST
+  deriving(Show,Eq)
 
+buildQuery :: [(String,String)] -> String
+buildQuery qis = "?" ++ intercalate "&" (map (\(a,b) -> (esc a) ++ "=" ++ (esc b)) qis) where
+  esc x = escapeURIString isAllowedInURI x
 
 initialAction :: (Monad m) => LoginT m RobotAction
 initialAction = do
   LoginState{..} <- get
-  return $ DoGET (serializeRelativeRef' (
-    RelativeRef Nothing "/authorize" (Query [
-        ("client_id", BS.pack (aid_string ls_appid))
-      , ("scope", BS.pack (toUrlArg ls_rights))
+  return $ DoGET (
+    URI ("https:") (Just (URIAuth "" "oauth.vk.com" "443")) "/authorize" (buildQuery [
+        ("client_id", aid_string ls_appid)
+      , ("scope", toUrlArg ls_rights)
       , ("redirect_url", "https://oauth.vk.com/blank.html")
       , ("display", "wap")
       , ("response_type", "token")
-      ]) Nothing)) []
+      , ("foo&foo","bar =bar")
+      ]) []) (createCookieJar [])
 
-renderCookiesText' :: CookiesText -> ByteString
-renderCookiesText' = BB.toByteString . renderCookiesText
+-- renderCookiesText' :: CookiesText -> ByteString
+-- renderCookiesText' = BB.toByteString . renderCookiesText
 
 actionRequest :: (MonadIO m) => RobotAction -> LoginT m Request
-actionRequest (DoGET url cookies) = do
+actionRequest (DoGET url cookiejar) = do
   LoginState{..} <- get
-  return $ buildRequest1 $ do
-    http GET url
-    when (not (null cookies)) $ do
-      setHeader "Cookie" (renderCookiesText' cookies)
+  now <- liftIO $ getCurrentTime
+  r <- either (error.show) return $ setUri def url
+  (r,_) <- pure $ insertCookiesIntoRequest r cookiejar now
+  return r
 
 
 newtype VKT_ r m a = VKT_ { unVK :: ContT r (LoginT m) a }
@@ -122,22 +140,34 @@ test_loop fixer m = do
     VKUnexpected err cont -> fixer err >>= test_loop fixer . cont
 
 
+-- test_login :: (MonadIO m) => LoginT m ()
+-- test_login = do
+--   a <- initialAction
+--   r <- actionRequest a
+--   liftIO $ do
+--     ctx <- baselineContextSSL
+--     c <- openConnectionSSL ctx "oauth.vk.com" 443
+--     sendRequest c r emptyBody
+--     receiveResponse c (\h b -> do
+--       -- putStrLn (show h)
+--       Streams.connect b stdout)
+--     closeConnection c
+
 test_login :: (MonadIO m) => LoginT m ()
 test_login = do
-  a <- initialAction
-  r <- actionRequest a
+  act <- initialAction
+  req <- actionRequest act
   liftIO $ do
-    ctx <- baselineContextSSL
-    c <- openConnectionSSL ctx "oauth.vk.com" 443
-    sendRequest c r emptyBody
-    receiveResponse c (\h b -> do
-      -- putStrLn (show h)
-      Streams.connect b stdout)
-    closeConnection c
+    putStrLn (show req)
+    return ()
+    -- m <- newManager tlsManagerSettings
+    -- withHTTP req m $ \res -> do
+    --   b <- PP.foldM (\a b -> return $ BS.append a b) (return BS.empty) return (responseBody res)
+    --   BS.putStrLn b
 
-test = serializeRelativeRef' $ RelativeRef {
-    rrAuthority = Nothing,
-    rrPath = "/foo",
-    rrQuery = Query {queryPairs = [("bar","baz")]},
-    rrFragment = Just "quux"
-    }
+-- test = serializeRelativeRef' $ RelativeRef {
+--     rrAuthority = Nothing,
+--     rrPath = "/foo",
+--     rrQuery = Query {queryPairs = [("bar","baz")]},
+--     rrFragment = Just "quux"
+--     }
