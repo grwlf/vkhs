@@ -14,7 +14,6 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Cont
-import Control.Monad.Catch
 import Data.Default.Class
 
 import Data.ByteString.Char8 (ByteString)
@@ -67,30 +66,39 @@ newtype VKT_ r m a = VKT_ { unVK :: ContT r (ClientT m) a }
 liftCont :: ((a -> ClientT m r) -> ClientT m r) -> VKT_ r m a
 liftCont f = VKT_ (ContT f)
 
-data Error x = ETimeout | EClient Client.Error
+data Error = ETimeout | EClient Client.Error
   deriving(Show, Eq, Ord)
 
 data Result m a =
     Fine a
-  | forall x . Unexpected (Error x) (x -> VKT_ (Result m a) m a)
+  | UnexpectedInt Error (Int -> VKT_ (Result m a) m a)
+  | UnexpectedBool Error (Bool -> VKT_ (Result m a) m a)
+  | UnexpectedURL Client.Error (URL -> VKT_ (Result m a) m a)
 
 -- type VKT m a = VKT_ (Result m) m a
 
 runVK :: (Monad m) => VKT_ a m a -> ClientT m a
 runVK m = runContT (unVK m) return
 
-raiseError :: (Monad m) => Error a -> VKT_ (Result m x) m a
+-- raiseError :: (Monad m) => Error -> VKT_ (Result m x) m Int
+-- raiseError ex = liftCont (\cont -> do
+--   return (UnexpectedInt ex (\x -> liftCont (\cont' -> do
+--     res <- cont x
+--     case res of
+--       Fine a -> cont' a
+--       x -> return x))))
+
+raiseError :: (Monad m) => ((z -> VKT_ (Result m x) m x) -> Result m x) -> VKT_ (Result m x) m z
 raiseError ex = liftCont (\cont -> do
-  return (Unexpected ex (\x -> liftCont (\cont' -> do
+  return (ex (\x -> liftCont (\cont' -> do
     res <- cont x
     case res of
       Fine a -> cont' a
       x -> return x))))
 
-client :: (Monad m) => Either Client.Error a -> VKT_ (Result m x) m a
-client (Right a) = return a
-client (Left err) = raiseError (EClient err)
-
+handle :: Monad m => (t -> (a -> VKT_ (Result m x) m x) -> Result m x) -> Either t a -> VKT_ (Result m x) m a
+handle ctx (Right u) = return u
+handle ctx (Left e) = raiseError (\k -> ctx e k)
 
 data RobotAction = DoGET URL Cookies | DoPOST
   deriving(Show,Eq)
@@ -99,8 +107,8 @@ initialAction :: (Monad m) => VKT_ (Result m RobotAction) m RobotAction
 initialAction = do
   ClientState{..} <- get
   Options{..} <- pure ls_options
-  u <- client (urlCreate (URL_Protocol "https") (URL_Host o_host) (Just (URL_Port o_port)) (URL_Path "/authorize") (buildQuery [ ("client_id", aid_string ls_appid) , ("scope", toUrlArg ls_rights) , ("redirect_url", "https://oauth.vk.com/blank.html") , ("display", "wap") , ("response_type", "token") ]))
-  return $ DoGET u (cookiesCreate ())
+  u <- handle UnexpectedURL (urlCreate (URL_Protocol "https") (URL_Host o_host) (Just (URL_Port o_port)) (URL_Path "/authorize") (buildQuery [ ("client_id", aid_string ls_appid) , ("scope", toUrlArg ls_rights) , ("redirect_url", "https://oauth.vk.com/blank.html") , ("display", "wap") , ("response_type", "token") ]))
+  return (DoGET u (cookiesCreate ()))
 
 -- actionRequest :: (MonadIO m) => RobotAction -> VKT m Request
 -- actionRequest (DoGET url cookiejar) = do
