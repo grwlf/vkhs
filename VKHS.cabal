@@ -20,11 +20,6 @@ library
   hs-source-dirs:    src
   other-modules:
 
-  -- maybe not elegant, but convenient during tests
-  -- if os(windows)
-  --   include-dirs:   .\curl-7.25.0-devel-mingw32\include
-  --   extra-lib-dirs: .\curl-7.25.0-devel-mingw32\bin
-
   exposed-modules:
                      Web.VKHS2
                      Web.VKHS2.Types

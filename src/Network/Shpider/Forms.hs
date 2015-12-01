@@ -1,4 +1,5 @@
 {-
+ -
  - Copyright (c) 2009-2010 Johnny Morrice
  -
  - Permission is hereby granted, free of charge, to any person
@@ -21,10 +22,10 @@
  - CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  - SOFTWARE.
  -
- -}
+-}
 module Network.Shpider.Forms 
-   (
-   Form (..)
+   ( module Network.Shpider.Pairs 
+   , Form (..)
    , Method (..)
    , gatherForms
    , fillOutForm
@@ -35,12 +36,17 @@ module Network.Shpider.Forms
    where
 
 import Data.Maybe
-import Data.Char
-import Control.Arrow ( first )
+
 import qualified Data.Map as M
+
 import Text.HTML.TagSoup.Parsec
 
-data Method = GET | POST
+import Network.Shpider.TextUtils
+import Network.Shpider.Pairs
+
+-- | Either GET or POST.
+data Method =
+   GET | POST
    deriving Show
 
 -- | Plain old form: Method, action and inputs.
@@ -61,7 +67,10 @@ data Form =
 --    \"message\" =: \"Nice syntax dewd.\"
 -- @
 fillOutForm :: Form -> [ ( String , String ) ] -> Form
-fillOutForm = foldl ( \f (n,v) -> f { inputs = M.insert n v $ inputs f } )
+fillOutForm f is =
+   foldl ( \ form ( n , v ) -> form { inputs = M.insert n v $ inputs form } )
+         f
+         is
 
 -- | The first argument is the action attribute of the form, the second is the method attribute, and the third are the inputs.
 mkForm :: String -> Method -> [ ( String , String ) ] -> Form
@@ -81,16 +90,6 @@ allForms :: TagParser String [ Form ]
 allForms = do
    fs <- allWholeTags "form"
    return $ mapMaybe toForm fs
-
--- | A case insensitive lookup for html attributes.
-attrLookup :: String -> [ ( String , String ) ] -> Maybe String
-attrLookup attr =
-   lookup ( map toLower attr ) . map ( first (map toLower) )
-
--- | Turns a String lowercase.  <rant>In my humble opinion, and considering that a few different packages implement this meager code, this should be in the prelude.</rant>
-lowercase :: String -> String 
-lowercase = map toLower
-
 
 toForm :: WholeTag String -> Maybe Form
 toForm ( TagOpen _ attrs , innerTags , _ ) = do
