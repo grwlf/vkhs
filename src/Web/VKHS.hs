@@ -21,19 +21,26 @@ import Web.VKHS.Monad
 
 {- Test -}
 
-test_loop :: (Monad m) => (Error -> ClientT m a) -> VKT m a -> ClientT m a
-test_loop fixer m = do
+test_loop :: (Monad m) => VKT a m a -> ClientT m (ResultDescription a)
+test_loop m = do
   res <- runVK m
   case res of
-    Fine x -> return x
-    Unexpected err cont -> fixer err >>= test_loop fixer . cont
+    UnexpectedInt e k -> test_loop (k 0)
+    _ -> return (describeResult res)
 
 
-test_login :: (MonadIO m) => ClientT m ()
-test_login = do
-  act <- initialAction
-  req <- actionRequest act
-  liftIO $ do
-    putStrLn (show req)
-    return ()
+-- test_loop :: (Monad m) => (Error -> ClientT m a) -> VKT m a -> ClientT m a
+-- test_loop fixer m = do
+--   res <- runVK m
+--   case res of
+--     Fine x -> return x
+--     Unexpected err cont -> fixer err >>= test_loop fixer . cont
+
+-- test_login :: (MonadIO m) => ClientT m ()
+-- test_login = do
+--   act <- initialAction
+--   req <- actionRequest act
+--   liftIO $ do
+--     putStrLn (show req)
+--     return ()
 
