@@ -12,7 +12,6 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Cont
-import Control.Monad.Catch
 import Data.Default.Class
 
 import Data.ByteString.Char8 (ByteString)

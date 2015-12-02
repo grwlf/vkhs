@@ -11,7 +11,6 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Cont
-import Control.Monad.Catch
 
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS

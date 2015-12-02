@@ -1,6 +1,6 @@
 
-name:                VKHS2
-version:             0.5.7
+name:                VKHS
+version:             0.6.0
 synopsis:            Provides access to Vkontakte social network via public API
 description:
     Provides access to Vkontakte API methods. Library requires no interaction
@@ -21,8 +21,11 @@ library
   other-modules:
 
   exposed-modules:
-                     Web.VKHS2
-                     Web.VKHS2.Types
+                     Web.VKHS
+                     Web.VKHS.Types
+                     Web.VKHS.Monad
+                     Web.VKHS.Client
+                     Web.VKHS.Login
 
   build-depends:     base >=4.6 && <5,
                      containers,
@@ -34,11 +37,12 @@ library
                      pipes,
                      pipes-http,
                      time,
-                     exceptions,
-                     data-default-class
+                     data-default-class,
+                     parsec,
+                     tagsoup
 
 
-executable vkq
-  hs-source-dirs:    src
-  main-is:           VKQ2.hs
+--executable vkq
+--  hs-source-dirs:    src
+--  main-is:           VKQ2.hs
 
