@@ -13,6 +13,9 @@ import Control.Monad
 import Control.Monad.State
 import Control.Monad.Cont
 import Data.Default.Class
+import qualified Data.CaseInsensitive as CI
+
+import System.IO.Unsafe
 
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -22,6 +25,10 @@ import Network.HTTP.Client.Internal (setUri)
 import qualified Network.HTTP.Client as Client
 import qualified Network.HTTP.Client.Internal as Client
 import qualified Network.URI as Client
+
+import Pipes.Prelude as PP  (foldM)
+import Pipes as Pipes (Producer(..), for, runEffect, (>->))
+import Pipes.HTTP as Pipes hiding (Request, Response)
 
 import qualified Network.Shpider.Forms as Shpider
 
@@ -34,6 +41,29 @@ newtype From = Form Shpider.Form
 newtype FilledForm = FilledForm Shpider.Form
   deriving(Show)
 
+
+{-
+ __  __                       _
+|  \/  | ___  _ __   __ _  __| |
+| |\/| |/ _ \| '_ \ / _` |/ _` |
+| |  | | (_) | | | | (_| | (_| |
+|_|  |_|\___/|_| |_|\__,_|\__,_|
+-}
+
+data ClientState = ClientState {
+    cl_man :: Client.Manager
+  }
+
+newtype ClientT m a = ClientT { unClient :: StateT ClientState m a }
+  deriving(Functor, Applicative, Monad, MonadState ClientState, MonadIO)
+
+runClient :: (MonadIO m) => ClientT m a -> m a
+runClient l = do
+  cl_man <- liftIO $ newManager defaultManagerSettings
+  evalStateT (unClient l) ClientState{..}
+
+liftClient :: (Monad m) => m a -> ClientT m a
+liftClient = ClientT . lift
 
 {-
  _   _ ____  _
@@ -88,13 +118,33 @@ cookiesCreate () = Cookies (Client.createCookieJar [])
 
 newtype Request = Request { req :: Client.Request }
 
-requestCreate :: URL -> Cookies -> IO (Either Error Request)
+requestCreate :: URL -> Cookies -> Either Error Request
 requestCreate URL{..} Cookies{..} = do
-  now <- liftIO $ getCurrentTime
   case setUri def uri of
-    Left exc -> return (Left $ Error (show exc))
-    Right r -> do
-      (r,_) <- pure $ Client.insertCookiesIntoRequest r jar now
-      return (Right $ Request r)
+    Left exc -> Left $ Error (show exc)
+    Right r ->
+      let
+        now = unsafePerformIO getCurrentTime
+        (r,_) = Client.insertCookiesIntoRequest r jar now
+      in
+      return (Request r)
 
+data Response = Response {
+    resp :: Client.Response (Pipes.Producer ByteString IO ())
+  , resp_body :: ByteString
+  }
+
+responseCookies :: Response -> Cookies
+responseCookies Response{..} = Cookies (responseCookieJar resp)
+
+responseHeaders :: Response -> [(String,String)]
+responseHeaders Response{..} =
+  map (\(o,h) -> (BS.unpack (CI.original o), BS.unpack h)) $ Client.responseHeaders resp
+
+requestExecute :: (MonadIO m) => Request -> ClientT m Response
+requestExecute Request{..} = do
+  ClientState{..} <- get
+  liftIO $ withHTTP req cl_man $ \resp -> do
+    resp_body <- PP.foldM (\a b -> return $ BS.append a b) (return BS.empty) return (Client.responseBody resp)
+    return Response{..}
 
