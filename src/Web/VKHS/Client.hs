@@ -22,6 +22,7 @@ import qualified Data.ByteString.Char8 as BS
 
 import Network.HTTP.Client ()
 import Network.HTTP.Client.Internal (setUri)
+import qualified Network.HTTP.Types as Client
 import qualified Network.HTTP.Client as Client
 import qualified Network.HTTP.Client.Internal as Client
 import qualified Network.URI as Client
@@ -134,12 +135,25 @@ data Response = Response {
   , resp_body :: ByteString
   }
 
+responseBody :: Response -> ByteString
+responseBody Response{..} = resp_body
+
 responseCookies :: Response -> Cookies
 responseCookies Response{..} = Cookies (responseCookieJar resp)
 
 responseHeaders :: Response -> [(String,String)]
 responseHeaders Response{..} =
   map (\(o,h) -> (BS.unpack (CI.original o), BS.unpack h)) $ Client.responseHeaders resp
+
+responseCode :: Response -> Int
+responseCode Response{..} = Client.statusCode $ Client.responseStatus resp
+
+responseCodeMessage :: Response -> String
+responseCodeMessage Response{..} = BS.unpack $ Client.statusMessage $ Client.responseStatus resp
+
+responseOK :: Response -> Bool
+responseOK r = c == 200 where
+  c = responseCode r
 
 requestExecute :: (MonadIO m) => Request -> ClientT m Response
 requestExecute Request{..} = do

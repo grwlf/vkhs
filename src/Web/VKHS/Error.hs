@@ -9,7 +9,7 @@ data Error = ETimeout | EClient Client.Error
 
 data Result' k m a =
     Fine a
-  | MFine (m a) {- MFine tolds the GHC the real (* -> *) kind of m -}
+  | MFine (m a) {- MFine tolds the GHC that the real kind of m is (* -> *) -}
   | UnexpectedInt Error (Int -> k (Result' k m a) m a)
   | UnexpectedBool Error (Bool -> k (Result' k m a) m a)
   | UnexpectedURL Client.Error (URL -> k (Result' k m a) m a)
