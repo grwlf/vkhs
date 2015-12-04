@@ -55,7 +55,7 @@ initialAction :: (MonadIO m, ToLoginState s) => VKT s z m RobotAction
 initialAction = do
   LoginState{..} <- getLoginState
   Options{..} <- pure ls_options
-  u <- ensure
+  u <- ensure $ pure
         (urlCreate
           (URL_Protocol "https")
           (URL_Host o_host)
@@ -73,9 +73,9 @@ initialAction = do
 actionRequest :: (MonadIO m, ToLoginState s) => RobotAction -> VKT s z m Request
 actionRequest (DoGET url cookiejar) = do
   LoginState{..} <- getLoginState
-  req <- ensure $ requestCreate url cookiejar
-  res <- ensure $ requestExecute req
-  -- let forms = (Tagsoup.parseTags >>> Shpider.gatherForms) (BS.unpack $ responseBody res)
+  req <- ensure $ pure $ requestCreate url cookiejar
+  res <- client $ requestExecute req
+  let forms = (Tagsoup.parseTags >>> Shpider.gatherForms) (responseBody res)
   return req
 actionRequest (DoPOST) = do
   undefined

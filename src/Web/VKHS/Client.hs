@@ -135,8 +135,8 @@ data Response = Response {
   , resp_body :: ByteString
   }
 
-responseBody :: Response -> ByteString
-responseBody Response{..} = resp_body
+responseBody :: Response -> String
+responseBody Response{..} = BS.unpack $ resp_body
 
 responseCookies :: Response -> Cookies
 responseCookies Response{..} = Cookies (responseCookieJar resp)

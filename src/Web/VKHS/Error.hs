@@ -1,7 +1,7 @@
 module Web.VKHS.Error where
 
 import Web.VKHS.Types
-import Web.VKHS.Client (Request, URL)
+import Web.VKHS.Client (Response, Request, URL)
 import qualified Web.VKHS.Client as Client
 
 data Error = ETimeout | EClient Client.Error
@@ -14,6 +14,7 @@ data Result' k m a =
   | UnexpectedBool Error (Bool -> k (Result' k m a) m a)
   | UnexpectedURL Client.Error (URL -> k (Result' k m a) m a)
   | UnexpectedRequest Client.Error (Request -> k (Result' k m a) m a)
+  | UnexpectedResponse Client.Error (Response -> k (Result' k m a) m a)
 
 data ResultDescription a =
     DescFine a

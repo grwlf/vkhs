@@ -55,6 +55,9 @@ raiseError ex = liftCont (\cont -> do
       Fine a -> cont' a
       x -> return x))))
 
+client :: (Monad m) => ClientT m a -> VKT s x m a
+client = undefined
+
 class (Monad m) => VK_Error m c t a where
   handle :: (t -> (a -> VKT s x m x) -> Result s m x) -> c -> VKT s x m a
 
@@ -65,21 +68,21 @@ instance (Monad m) => VK_Error m (Either t a) t a where
 instance (MonadIO m) => VK_Error m (IO (Either t a)) t a where
   handle ctx m = liftIO m >>= handle ctx
 
+instance (MonadIO m) => VK_Error m (ClientT m a) t a where
+  handle ctx m = undefined
 
-class (Monad m) => VK_Ensure m c a | c -> a where
-  ensure :: c -> VKT s x m a
+class VK_Ensure c a | c -> a where
+  ensure :: (Monad m) => VKT s x m c -> VKT s x m a
 
-instance (Monad m) => VK_Ensure m (Either Client.Error Request) Request where
-  ensure (Right u) = return u
-  ensure (Left e) = raiseError (\k -> UnexpectedRequest e k)
+instance VK_Ensure (Either Client.Error Request) Request where
+  ensure m  = m >>= \x ->
+    case x of
+      (Right u) -> return u
+      (Left e) -> raiseError (\k -> UnexpectedRequest e k)
 
-instance (Monad m) => VK_Ensure m (Either Client.Error URL) URL where
-  ensure (Right u) = return u
-  ensure (Left e) = raiseError (\k -> UnexpectedURL e k)
-
-instance (VK_Ensure m (Either t a) a, MonadIO m) => VK_Ensure m (IO (Either t a)) a where
-  ensure m = liftIO m >>= ensure
-
-instance (Monad m) => VK_Ensure m (ClientT m a) a where
-  ensure m = undefined
+instance VK_Ensure (Either Client.Error URL) URL where
+  ensure m  = m >>= \x ->
+    case x of
+      (Right u) -> return u
+      (Left e) -> raiseError (\k -> UnexpectedURL e k)
 
