@@ -1,6 +1,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 module Web.VKHS.Login where
 
 import Data.List
@@ -44,16 +47,17 @@ defaultState = LoginState {
 class ToLoginState s where
   toLoginState :: s -> LoginState
 
-getLoginState :: (MonadState s m, ToLoginState s) => m LoginState
-getLoginState = toLoginState <$> get
+class (MonadIO m, ToClientState s, MonadClient s m, ToLoginState s) => MonadLogin s m | m -> s
 
 -- | Login robot action
 data RobotAction = DoGET URL Cookies | DoPOST
   deriving(Show,Eq)
 
-initialAction :: (MonadIO m, ToLoginState s) => VKT s z m RobotAction
+type R m x = Result m x
+
+initialAction :: (MonadLogin s (m (R m x)), MonadVK m) => m (R m x) RobotAction
 initialAction = do
-  LoginState{..} <- getLoginState
+  LoginState{..} <- toLoginState <$> get
   Options{..} <- pure ls_options
   u <- ensure $ pure
         (urlCreate
@@ -70,11 +74,11 @@ initialAction = do
             ]))
   return (DoGET u (cookiesCreate ()))
 
-actionRequest :: (MonadIO m, ToLoginState s) => RobotAction -> VKT s z m Request
+actionRequest :: (MonadLogin s (m (R m x)), MonadVK m) => RobotAction -> m (R m x) Request
 actionRequest (DoGET url cookiejar) = do
-  LoginState{..} <- getLoginState
+  LoginState{..} <- toLoginState <$> get
   req <- ensure $ pure $ requestCreate url cookiejar
-  res <- client $ requestExecute req
+  res <- requestExecute req
   let forms = (Tagsoup.parseTags >>> Shpider.gatherForms) (responseBody res)
   return req
 actionRequest (DoPOST) = do

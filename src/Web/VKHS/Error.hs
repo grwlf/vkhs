@@ -7,14 +7,13 @@ import qualified Web.VKHS.Client as Client
 data Error = ETimeout | EClient Client.Error
   deriving(Show, Eq, Ord)
 
-data Result' k m a =
+data Result t a =
     Fine a
-  | MFine (m a) {- MFine tolds the GHC that the real kind of m is (* -> *) -}
-  | UnexpectedInt Error (Int -> k (Result' k m a) m a)
-  | UnexpectedBool Error (Bool -> k (Result' k m a) m a)
-  | UnexpectedURL Client.Error (URL -> k (Result' k m a) m a)
-  | UnexpectedRequest Client.Error (Request -> k (Result' k m a) m a)
-  | UnexpectedResponse Client.Error (Response -> k (Result' k m a) m a)
+  | UnexpectedInt Error (Int -> t (Result t a) a)
+  | UnexpectedBool Error (Bool -> t (Result t a) a)
+  | UnexpectedURL Client.Error (URL -> t (Result t a) a)
+  | UnexpectedRequest Client.Error (Request -> t (Result t a) a)
+  | UnexpectedResponse Client.Error (Response -> t (Result t a) a)
 
 data ResultDescription a =
     DescFine a
@@ -22,7 +21,7 @@ data ResultDescription a =
   | DescClientError Client.Error
   deriving(Show)
 
-describeResult :: Result' k m a -> ResultDescription a
+describeResult :: Result t a -> ResultDescription a
 describeResult (Fine a) = DescFine a
 describeResult (UnexpectedInt e k) = DescVKError e
 describeResult (UnexpectedBool e k) = DescVKError e

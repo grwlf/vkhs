@@ -28,59 +28,63 @@ import Web.VKHS.Types
 import Web.VKHS.Client hiding(Error)
 import qualified Web.VKHS.Client as Client
 
-newtype VKClientT s m a = VKClientT { unVKClient :: StateT s (ClientT m) a }
-  deriving(Functor, Applicative, Monad, MonadState s, MonadIO)
+newtype VKT m r a = VKT { unVK :: ContT r m a }
+  deriving(Functor, Applicative, Monad, MonadCont, MonadIO)
 
-newtype VKT_ s r m a = VKT_ { unVK :: ContT r (VKClientT s m) a }
-  deriving(Functor, Applicative, Monad, MonadCont, MonadState s, MonadIO)
-
-liftCont :: ((a -> VKClientT s m r) -> VKClientT s m r) -> VKT_ s r m a
-liftCont f = VKT_ (ContT f)
+liftCont :: ((a -> m r) -> m r) -> VKT m r a
+liftCont f = VKT (ContT f)
 
 data Error = ETimeout | EClient Client.Error
   deriving(Show, Eq, Ord)
 
-type Result s m a = Result' (VKT_ s) m a
+-- type Result s m a = Result' (VKT_ s) m a
 
-type VKT s x m a = VKT_ s (Result s m x) m a
+-- type VKT s x m a = VKT_ s (Result s m x) m a
 
-runVK :: (Monad m) => VKT s a m a -> VKClientT s m (Result s m a)
-runVK m = runContT (unVK m) (return . Fine)
+-- runVK :: (Monad m) => VKT s a m a -> StateT s m (Result s m a)
+-- runVK m = runContT (unVK m) (return . Fine)
 
-raiseError :: (Monad m) => ((z -> VKT s x m x) -> Result s m x) -> VKT s x m z
-raiseError ex = liftCont (\cont -> do
+
+class MonadVK m where
+  raiseError :: ((z -> m (Result m x) x) -> Result m x) -> m (Result m x) z
+
+instance (Monad m) => MonadVK (VKT m) where
+  raiseError = raiseError_vk
+
+raiseError_vk :: (Monad m) => ((z -> VKT m (Result (VKT m) x) x) -> Result (VKT m) x) -> VKT m (Result (VKT m) x) z
+raiseError_vk ex = liftCont (\cont -> do
   return (ex (\x -> liftCont (\cont' -> do
     res <- cont x
     case res of
       Fine a -> cont' a
       x -> return x))))
 
-client :: (Monad m) => ClientT m a -> VKT s x m a
-client = undefined
+-- client :: (Monad m) => StateT m a -> VKT s x m a
+-- client = undefined
 
-class (Monad m) => VK_Error m c t a where
-  handle :: (t -> (a -> VKT s x m x) -> Result s m x) -> c -> VKT s x m a
+-- class (Monad m) => VK_Error m c t a where
+--   handle :: (t -> (a -> VKT s x m x) -> Result s m x) -> c -> VKT s x m a
 
-instance (Monad m) => VK_Error m (Either t a) t a where
-  handle ctx (Right u) = return u
-  handle ctx (Left e) = raiseError (\k -> ctx e k)
+-- instance (Monad m) => VK_Error m (Either t a) t a where
+--   handle ctx (Right u) = return u
+--   handle ctx (Left e) = raiseError (\k -> ctx e k)
 
-instance (MonadIO m) => VK_Error m (IO (Either t a)) t a where
-  handle ctx m = liftIO m >>= handle ctx
+-- instance (MonadIO m) => VK_Error m (IO (Either t a)) t a where
+--   handle ctx m = liftIO m >>= handle ctx
 
-instance (MonadIO m) => VK_Error m (ClientT m a) t a where
-  handle ctx m = undefined
+-- instance (MonadIO m) => VK_Error m (ClientT m a) t a where
+--   handle ctx m = undefined
 
-class VK_Ensure c a | c -> a where
-  ensure :: (Monad m) => VKT s x m c -> VKT s x m a
+class EnsureVK c a | c -> a where
+  ensure :: (MonadVK m, Monad (m (Result m z))) => m (Result m z) c -> m (Result m z) a
 
-instance VK_Ensure (Either Client.Error Request) Request where
+instance EnsureVK (Either Client.Error Request) Request where
   ensure m  = m >>= \x ->
     case x of
       (Right u) -> return u
       (Left e) -> raiseError (\k -> UnexpectedRequest e k)
 
-instance VK_Ensure (Either Client.Error URL) URL where
+instance EnsureVK (Either Client.Error URL) URL where
   ensure m  = m >>= \x ->
     case x of
       (Right u) -> return u

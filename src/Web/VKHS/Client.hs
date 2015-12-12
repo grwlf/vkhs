@@ -2,6 +2,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 module Web.VKHS.Client where
 
 import Data.List
@@ -55,16 +57,21 @@ data ClientState = ClientState {
     cl_man :: Client.Manager
   }
 
-newtype ClientT m a = ClientT { unClient :: StateT ClientState m a }
-  deriving(Functor, Applicative, Monad, MonadState ClientState, MonadIO)
+class ToClientState s where
+  toClientState :: s -> ClientState
 
-runClient :: (MonadIO m) => ClientT m a -> m a
-runClient l = do
-  cl_man <- liftIO $ newManager defaultManagerSettings
-  evalStateT (unClient l) ClientState{..}
+class (MonadIO m, MonadState s m, ToClientState s) => MonadClient s m  | m -> s
 
-liftClient :: (Monad m) => m a -> ClientT m a
-liftClient = ClientT . lift
+-- newtype ClientT m a = ClientT { unClient :: StateT ClientState m a }
+--   deriving(Functor, Applicative, Monad, MonadState ClientState, MonadIO)
+
+-- runClient :: (MonadIO m) => ClientT m a -> m a
+-- runClient l = do
+--   cl_man <- liftIO $ newManager defaultManagerSettings
+--   evalStateT (unClient l) ClientState{..}
+
+-- liftClient :: (Monad m) => m a -> ClientT m a
+-- liftClient = ClientT . lift
 
 {-
  _   _ ____  _
@@ -155,9 +162,9 @@ responseOK :: Response -> Bool
 responseOK r = c == 200 where
   c = responseCode r
 
-requestExecute :: (MonadIO m) => Request -> ClientT m Response
+requestExecute :: (MonadClient s m) => Request -> m Response
 requestExecute Request{..} = do
-  ClientState{..} <- get
+  ClientState{..} <- toClientState <$> get
   liftIO $ withHTTP req cl_man $ \resp -> do
     resp_body <- PP.foldM (\a b -> return $ BS.append a b) (return BS.empty) return (Client.responseBody resp)
     return Response{..}
