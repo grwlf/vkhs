@@ -1,3 +1,4 @@
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -28,11 +29,15 @@ import Web.VKHS.Types
 import Web.VKHS.Client hiding(Error)
 import qualified Web.VKHS.Client as Client
 
-newtype VKT m r a = VKT { unVK :: ContT r m a }
+newtype VKT m r a = VKT { unVKT :: ContT r m a }
   deriving(Functor, Applicative, Monad, MonadCont, MonadIO)
 
-liftCont :: ((a -> m r) -> m r) -> VKT m r a
-liftCont f = VKT (ContT f)
+instance MonadState s m => MonadState s (VKT m r) where
+  get = VKT $ lift get
+  put x = VKT $ lift (put x)
+
+-- liftCont :: ((a -> m r) -> m r) -> VKT m r a
+liftCont ctr f = ctr (ContT f)
 
 data Error = ETimeout | EClient Client.Error
   deriving(Show, Eq, Ord)
@@ -41,23 +46,30 @@ data Error = ETimeout | EClient Client.Error
 
 -- type VKT s x m a = VKT_ s (Result s m x) m a
 
--- runVK :: (Monad m) => VKT s a m a -> StateT s m (Result s m a)
--- runVK m = runContT (unVK m) (return . Fine)
-
+runVKT :: (Monad m) => (a -> r) -> (VKT m r a) -> m r
+runVKT f m = runContT (unVKT m) (return . f)
 
 class MonadVK m where
   raiseError :: ((z -> m (Result m x) x) -> Result m x) -> m (Result m x) z
 
 instance (Monad m) => MonadVK (VKT m) where
-  raiseError = raiseError_vk
+  raiseError = raiseError_vk VKT VKT
 
-raiseError_vk :: (Monad m) => ((z -> VKT m (Result (VKT m) x) x) -> Result (VKT m) x) -> VKT m (Result (VKT m) x) z
-raiseError_vk ex = liftCont (\cont -> do
-  return (ex (\x -> liftCont (\cont' -> do
+raiseError_vk :: Monad m =>
+     (ContT (Result t2 a1) m a -> t)
+  -> (ContT (Result t2 a1) m a1 -> t1)
+  -> ((a -> t1) -> Result t2 a1)
+  -> t
+raiseError_vk c1 c2 ex = liftCont c1 (\cont -> do
+  return (ex (\x -> liftCont c2 (\cont' -> do
     res <- cont x
     case res of
       Fine a -> cont' a
       x -> return x))))
+
+
+-- raiseError_vk2 ex = callCC (\esc ->
+--   )
 
 -- client :: (Monad m) => StateT m a -> VKT s x m a
 -- client = undefined

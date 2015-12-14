@@ -57,6 +57,11 @@ data ClientState = ClientState {
     cl_man :: Client.Manager
   }
 
+defaultState :: IO ClientState
+defaultState = do
+  cl_man <- Client.newManager Client.defaultManagerSettings
+  return ClientState{..}
+
 class ToClientState s where
   toClientState :: s -> ClientState
 

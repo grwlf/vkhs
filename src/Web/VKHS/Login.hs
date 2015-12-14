@@ -10,11 +10,15 @@ import Data.List
 import Data.Maybe
 import Data.Time
 import Data.Either
-import Control.Category
+import Control.Category ((>>>))
 import Control.Applicative
 import Control.Monad
 import Control.Monad.State
+import Control.Monad.Writer
 import Control.Monad.Cont
+
+import Data.Map (Map)
+import qualified Data.Map as Map
 
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -74,12 +78,25 @@ initialAction = do
             ]))
   return (DoGET u (cookiesCreate ()))
 
+showForm :: Shpider.Form -> String
+showForm Shpider.Form{..} =
+  let
+    telln x = tell (x ++ "\n")
+  in
+  execWriter $ do
+    telln $ show method
+    forM_ (Map.toList inputs) $ \(input,value) -> do
+      tell $ "*"
+      telln $ input ++ ":" ++ value
+    telln action
+
 actionRequest :: (MonadLogin s (m (R m x)), MonadVK m) => RobotAction -> m (R m x) Request
 actionRequest (DoGET url cookiejar) = do
   LoginState{..} <- toLoginState <$> get
   req <- ensure $ pure $ requestCreate url cookiejar
   res <- requestExecute req
   let forms = (Tagsoup.parseTags >>> Shpider.gatherForms) (responseBody res)
+  forM_ (forms) $ liftIO . putStrLn . showForm
   return req
 actionRequest (DoPOST) = do
   undefined
