@@ -7,13 +7,15 @@ import qualified Web.VKHS.Client as Client
 data Error = ETimeout | EClient Client.Error
   deriving(Show, Eq, Ord)
 
+type R t a = Result t a
+
 data Result t a =
     Fine a
-  | UnexpectedInt Error (Int -> t (Result t a) a)
-  | UnexpectedBool Error (Bool -> t (Result t a) a)
-  | UnexpectedURL Client.Error (URL -> t (Result t a) a)
-  | UnexpectedRequest Client.Error (Request -> t (Result t a) a)
-  | UnexpectedResponse Client.Error (Response -> t (Result t a) a)
+  | UnexpectedInt Error (Int -> t (R t a) (R t a))
+  | UnexpectedBool Error (Bool -> t (R t a) (R t a))
+  | UnexpectedURL Client.Error (URL -> t (R t a) (R t a))
+  | UnexpectedRequest Client.Error (Request -> t (R t a) (R t a))
+  | UnexpectedResponse Client.Error (Response -> t (R t a) (R t a))
 
 data ResultDescription a =
     DescFine a

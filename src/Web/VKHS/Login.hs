@@ -51,15 +51,13 @@ defaultState = LoginState {
 class ToLoginState s where
   toLoginState :: s -> LoginState
 
-class (MonadIO m, ToClientState s, MonadClient s m, ToLoginState s) => MonadLogin s m | m -> s
+class (MonadIO m, MonadClient s m, ToLoginState s, MonadVK m r) => MonadLogin m r s | m -> s
 
 -- | Login robot action
 data RobotAction = DoGET URL Cookies | DoPOST
   deriving(Show,Eq)
 
-type R m x = Result m x
-
-initialAction :: (MonadLogin s (m (R m x)), MonadVK m) => m (R m x) RobotAction
+initialAction :: (MonadLogin (m (R m x)) (R m x) s) => m (R m x) RobotAction
 initialAction = do
   LoginState{..} <- toLoginState <$> get
   Options{..} <- pure ls_options
@@ -90,7 +88,7 @@ showForm Shpider.Form{..} =
       telln $ input ++ ":" ++ value
     telln action
 
-actionRequest :: (MonadLogin s (m (R m x)), MonadVK m) => RobotAction -> m (R m x) Request
+actionRequest :: (MonadLogin (m (R m x)) (R m x) s) => RobotAction -> m (R m x) Request
 actionRequest (DoGET url cookiejar) = do
   LoginState{..} <- toLoginState <$> get
   req <- ensure $ pure $ requestCreate url cookiejar
