@@ -16,6 +16,7 @@ data Result t a =
   | UnexpectedURL Client.Error (URL -> t (R t a) (R t a))
   | UnexpectedRequest Client.Error (Request -> t (R t a) (R t a))
   | UnexpectedResponse Client.Error (Response -> t (R t a) (R t a))
+  | UnexpectedFormField Form String (String -> t (R t a) (R t a))
 
 data ResultDescription a =
     DescFine a

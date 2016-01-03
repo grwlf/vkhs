@@ -3,6 +3,8 @@ module Web.VKHS.Types where
 import Data.List
 import Data.Char
 
+import qualified Network.Shpider.Forms as Shpider
+
 -- | AccessToken is a authentication data, required by all VK API
 -- functions. It is a tuple of access_token, user_id, expires_in fields,
 -- returned by login procedure.
@@ -78,5 +80,12 @@ defaultOptions = Options {
   , o_port = "443"
   , o_verbose = False
   }
+
+
+data Form = Form { form :: Shpider.Form }
+  deriving(Show)
+
+data FilledForm = FilledForm { fform :: Shpider.Form }
+  deriving(Show)
 
 

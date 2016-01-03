@@ -34,19 +34,10 @@ import Pipes.Prelude as PP  (foldM)
 import Pipes as Pipes (Producer(..), for, runEffect, (>->))
 import Pipes.HTTP as Pipes hiding (Request, Response)
 
-import qualified Network.Shpider.Forms as Shpider
-
 import Debug.Trace
 
 data Error = Error String
   deriving(Show, Ord, Eq)
-
-newtype From = Form Shpider.Form
-  deriving(Show)
-
-newtype FilledForm = FilledForm Shpider.Form
-  deriving(Show)
-
 
 {-
  __  __                       _
@@ -171,10 +162,12 @@ responseOK :: Response -> Bool
 responseOK r = c == 200 where
   c = responseCode r
 
-requestExecute :: (MonadClient m s) => Request -> m Response
-requestExecute Request{..} = do
+requestExecute :: (MonadClient m s) => Request -> Cookies -> m (Response, Cookies)
+requestExecute Request{..} Cookies{..} = do
   ClientState{..} <- toClientState <$> get
   liftIO $ withHTTP req cl_man $ \resp -> do
     resp_body <- PP.foldM (\a b -> return $ BS.append a b) (return BS.empty) return (Client.responseBody resp)
-    return Response{..}
+    now <- getCurrentTime
+    let (jar', resp') = updateCookieJar resp req now jar
+    return (Response resp resp_body, Cookies jar')
 

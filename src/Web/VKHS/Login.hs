@@ -56,10 +56,12 @@ class ToLoginState s where
 class (MonadIO m, MonadClient m s, ToLoginState s, MonadVK m r) => MonadLogin m r s | m -> s
 
 -- | Login robot action
-data RobotAction = DoGET URL Cookies | DoPOST
-  deriving(Show,Eq)
+data RobotAction = DoGET URL Cookies | DoPOST Form Cookies
+  deriving(Show)
 
-initialAction :: (MonadLogin (m (R m x)) (R m x) s) => m (R m x) RobotAction
+type Login m x a = m (R m x) a
+
+initialAction :: (MonadLogin (m (R m x)) (R m x) s) => Login m x RobotAction
 initialAction = do
   LoginState{..} <- toLoginState <$> get
   Options{..} <- pure ls_options
@@ -89,14 +91,34 @@ showForm Shpider.Form{..} =
       telln $ "\t" ++ input ++ ":" ++ (if null value then "<empty>" else value)
     telln $ "Action " ++ action
 
-actionRequest :: (MonadLogin (m (R m x)) (R m x) s) => RobotAction -> m (R m x) Request
-actionRequest (DoGET url cookiejar) = do
+fillForm :: (MonadLogin (m (R m x)) (R m x) s) => Form -> Login m x FilledForm
+fillForm (Form f) = do
+    LoginState{..} <- toLoginState <$> get
+    fis <- forM (Map.toList (Shpider.inputs f)) $ \(input,value) -> do
+      case lookup input ls_formdata of
+        Just value' -> do
+          -- trace $ "Overwriting default value for " ++ input ++ "( " ++ value ++ ") with " ++ value' $ do
+          return (input, value')
+        Nothing -> do
+          case null value of
+            False -> do
+              -- trace "Using default value for " ++ input ++ " (" ++ value ++ ")" $ do
+              return (input, value)
+            True -> do
+              value' <- raise (\k -> UnexpectedFormField (Form f) input k)
+              return (input, value')
+    return $ FilledForm (f{Shpider.inputs = Map.fromList fis})
+
+actionRequest :: (MonadLogin (m (R m x)) (R m x) s) => RobotAction -> Login m x (Response, Cookies)
+actionRequest (DoGET url jar) = do
   LoginState{..} <- toLoginState <$> get
-  req <- ensure $ pure $ requestCreate url cookiejar
-  res <- requestExecute req
-  let forms = (Tagsoup.parseTags >>> Shpider.gatherForms) (responseBody res)
-  forM_ (forms) $ liftIO . putStrLn . showForm
-  return req
-actionRequest (DoPOST) = do
+  req <- ensure $ pure $ requestCreate url jar
+  (res, jar') <- requestExecute req jar
+  let forms = map Form $ (Tagsoup.parseTags >>> Shpider.gatherForms) (responseBody res)
+  forM_ forms $ \f -> do
+    ff <- fillForm f
+    liftIO $ putStrLn $ showForm $ fform ff
+  return (res,jar')
+actionRequest (DoPOST form jar) = do
   undefined
 

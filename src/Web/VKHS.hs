@@ -58,6 +58,12 @@ test_loop m = do
   res <- runVK m
   case res of
     UnexpectedInt e k -> liftIO (putStrLn "Int!") >> test_loop (k 0)
+    UnexpectedFormField (Form f) i k -> do
+      v <- liftIO $ do
+        putStrLn $ "While filling form " ++ (showForm f)
+        putStrLn $ "Please, enter the correct value for input " ++ i ++ " : "
+        getLine
+      test_loop (k v)
     _ -> return (describeResult res)
 
 test_run = initialState >>= evalStateT (test_loop $ do
