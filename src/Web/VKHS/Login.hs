@@ -31,6 +31,8 @@ import Web.VKHS.Client
 import Web.VKHS.Monad
 import Web.VKHS.Error
 
+import Debug.Trace
+
 data LoginState = LoginState {
     ls_rights :: [AccessRight]
   -- ^ Access rights to be requested
@@ -51,7 +53,7 @@ defaultState = LoginState {
 class ToLoginState s where
   toLoginState :: s -> LoginState
 
-class (MonadIO m, MonadClient s m, ToLoginState s, MonadVK m r) => MonadLogin m r s | m -> s
+class (MonadIO m, MonadClient m s, ToLoginState s, MonadVK m r) => MonadLogin m r s | m -> s
 
 -- | Login robot action
 data RobotAction = DoGET URL Cookies | DoPOST
@@ -82,11 +84,10 @@ showForm Shpider.Form{..} =
     telln x = tell (x ++ "\n")
   in
   execWriter $ do
-    telln $ show method
+    telln $ "Form " ++ (show method)
     forM_ (Map.toList inputs) $ \(input,value) -> do
-      tell $ "*"
-      telln $ input ++ ":" ++ value
-    telln action
+      telln $ "\t" ++ input ++ ":" ++ (if null value then "<empty>" else value)
+    telln $ "Action " ++ action
 
 actionRequest :: (MonadLogin (m (R m x)) (R m x) s) => RobotAction -> m (R m x) Request
 actionRequest (DoGET url cookiejar) = do

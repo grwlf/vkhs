@@ -24,6 +24,7 @@ import qualified Data.ByteString.Char8 as BS
 
 import Network.HTTP.Client ()
 import Network.HTTP.Client.Internal (setUri)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified Network.HTTP.Types as Client
 import qualified Network.HTTP.Client as Client
 import qualified Network.HTTP.Client.Internal as Client
@@ -34,6 +35,8 @@ import Pipes as Pipes (Producer(..), for, runEffect, (>->))
 import Pipes.HTTP as Pipes hiding (Request, Response)
 
 import qualified Network.Shpider.Forms as Shpider
+
+import Debug.Trace
 
 data Error = Error String
   deriving(Show, Ord, Eq)
@@ -59,13 +62,14 @@ data ClientState = ClientState {
 
 defaultState :: IO ClientState
 defaultState = do
-  cl_man <- Client.newManager Client.defaultManagerSettings
+  -- cl_man <- Client.newManager Client.defaultManagerSettings
+  cl_man <- Client.newManager tlsManagerSettings
   return ClientState{..}
 
 class ToClientState s where
   toClientState :: s -> ClientState
 
-class (MonadIO m, MonadState s m, ToClientState s) => MonadClient s m  | m -> s
+class (MonadIO m, MonadState s m, ToClientState s) => MonadClient m s | m -> s
 
 -- newtype ClientT m a = ClientT { unClient :: StateT ClientState m a }
 --   deriving(Functor, Applicative, Monad, MonadState ClientState, MonadIO)
@@ -105,7 +109,7 @@ buildQuery qis = URL_Query ("?" ++ intercalate "&" (map (\(a,b) -> (esc a) ++ "=
 
 urlCreate :: URL_Protocol -> URL_Host -> Maybe URL_Port -> URL_Path -> URL_Query -> Either Error URL
 urlCreate URL_Protocol{..} URL_Host{..} port  URL_Path{..} URL_Query{..} =
-  pure $ URL $ Client.URI (urlproto ++ ":") (Just (Client.URIAuth "" urlh (maybe "" urlp port))) urlpath urlq []
+  pure $ URL $ Client.URI (urlproto ++ ":") (Just (Client.URIAuth "" urlh (maybe "" ((":"++).urlp) port))) urlpath urlq []
 
 {-
   ____            _    _
@@ -138,9 +142,9 @@ requestCreate URL{..} Cookies{..} = do
     Right r ->
       let
         now = unsafePerformIO getCurrentTime
-        (r,_) = Client.insertCookiesIntoRequest r jar now
+        (r',_) = Client.insertCookiesIntoRequest r jar now
       in
-      return (Request r)
+      return (Request r'{redirectCount = 0})
 
 data Response = Response {
     resp :: Client.Response (Pipes.Producer ByteString IO ())
@@ -167,7 +171,7 @@ responseOK :: Response -> Bool
 responseOK r = c == 200 where
   c = responseCode r
 
-requestExecute :: (MonadClient s m) => Request -> m Response
+requestExecute :: (MonadClient m s) => Request -> m Response
 requestExecute Request{..} = do
   ClientState{..} <- toClientState <$> get
   liftIO $ withHTTP req cl_man $ \resp -> do

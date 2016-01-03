@@ -1,9 +1,9 @@
-module Main where
+-- module Main where
 
-import Web.VKHS2
+import Web.VKHS
 
 
 main :: IO ()
 main = do
-  runLogin defaultState test_login
+  test_run
   return ()

@@ -39,10 +39,13 @@ library
                      time,
                      data-default-class,
                      parsec,
-                     tagsoup
+                     tagsoup,
+                     case-insensitive,
+                     http-types
 
 
---executable vkq
---  hs-source-dirs:    src
---  main-is:           VKQ2.hs
+executable vkq
+  hs-source-dirs:    src
+  main-is:           VKQ.hs
+
 

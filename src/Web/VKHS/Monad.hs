@@ -31,8 +31,6 @@ import Web.VKHS.Client hiding(Error)
 import qualified Web.VKHS.Client as Client
 
 
-type Guts x m r a = ReaderT (r -> x m r r) (ContT r m) a
-
 -- newtype VKT m r a = VKT { unVKT :: StateT (r -> VKT m r r) (ContT r m) a }
 --   deriving(Functor, Applicative, Monad, MonadState (r -> VKT m r r), MonadCont, MonadIO)
 

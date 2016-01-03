@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Web.VKHS where
 
 import Data.List
@@ -12,6 +13,7 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.State (MonadState, execState, evalStateT, StateT(..))
 import Control.Monad.Cont
+import Control.Monad.Reader
 
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -21,6 +23,8 @@ import Web.VKHS.Types
 import Web.VKHS.Login as Login
 import Web.VKHS.Client as Client
 import Web.VKHS.Monad
+
+import Debug.Trace
 
 {- Test -}
 
@@ -37,25 +41,28 @@ instance ToClientState State where
 initialState :: IO State
 initialState = State <$> Client.defaultState <*> pure Login.defaultState
 
-type ST a = StateT State IO a
+newtype VK r a = VK { unVK :: Guts VK (StateT State IO) r a }
+  deriving(MonadIO, Functor, Applicative, Monad, MonadState State, MonadReader (r -> VK r r) , MonadCont)
 
-newtype VK r a = VK { unVK :: VKT (StateT State IO) r a }
-  deriving(MonadIO, Functor, Applicative, Monad, MonadState State, MonadCont)
+instance MonadClient (VK r) State
+instance MonadVK (VK r) r
+instance MonadLogin (VK r) r State
 
-instance MonadClient State (VK r)
-instance MonadLogin State (VK r)
--- instance MonadVK VK where
---   raiseError = raiseError_vk VK VK
+type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
 
--- test_loop :: (Monad m) => VKT m (Result (VKT m) a) a -> m (ResultDescription a)
+runVK :: VK r r -> StateT State IO r
+runVK m = runContT (runReaderT (unVK (catch m)) undefined) return
+
+test_loop :: VK (R VK a) (R VK a) -> StateT State IO (ResultDescription a)
 test_loop m = do
-  res <- runVKT Fine (unVK m)
+  res <- runVK m
   case res of
-    UnexpectedInt e k -> test_loop (k 0)
+    UnexpectedInt e k -> liftIO (putStrLn "Int!") >> test_loop (k 0)
     _ -> return (describeResult res)
 
-runVK :: VK (Result VK a) a -> IO (ResultDescription a)
-runVK m = do
-  s <- initialState
-  evalStateT (test_loop m) s
+test_run = initialState >>= evalStateT (test_loop $ do
+  a <- initialAction
+  trace (show a) $ do
+  r <- actionRequest a
+  return $ Fine r )
 
