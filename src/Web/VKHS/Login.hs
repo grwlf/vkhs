@@ -43,11 +43,11 @@ data LoginState = LoginState {
   , ls_options :: Options
   } deriving (Show)
 
-defaultState = LoginState {
+defaultState o = LoginState {
     ls_rights = allAccess
   , ls_appid = (AppID "3128877")
   , ls_formdata = []
-  , ls_options = defaultOptions
+  , ls_options = o
   }
 
 class ToLoginState s where
@@ -56,8 +56,12 @@ class ToLoginState s where
 class (MonadIO m, MonadClient m s, ToLoginState s, MonadVK m r) => MonadLogin m r s | m -> s
 
 -- | Login robot action
-data RobotAction = DoGET URL Cookies | DoPOST Form Cookies
+data RobotAction = DoGET URL Cookies | DoPOST FilledForm Cookies
   deriving(Show)
+
+printAction :: String -> RobotAction -> String
+printAction prefix (DoGET url jar) = prefix ++ " GET " ++ (show url)
+printAction prefix (DoPOST FilledForm{..} jar) = printForm prefix fform
 
 type Login m x a = m (R m x) a
 
@@ -65,35 +69,39 @@ initialAction :: (MonadLogin (m (R m x)) (R m x) s) => Login m x RobotAction
 initialAction = do
   LoginState{..} <- toLoginState <$> get
   Options{..} <- pure ls_options
+  let
+    protocol = (case o_use_https of
+                  True -> "https"
+                  False -> "http")
   u <- ensure $ pure
         (urlCreate
-          (URL_Protocol "https")
+          (URL_Protocol protocol)
           (URL_Host o_host)
-          (Just (URL_Port o_port))
+          (Just (URL_Port (show o_port)))
           (URL_Path "/authorize")
           (buildQuery [
               ("client_id", aid_string ls_appid)
             , ("scope", toUrlArg ls_rights)
-            , ("redirect_url", "https://oauth.vk.com/blank.html")
+            , ("redirect_url", protocol ++ "://oauth.vk.com/blank.html")
             , ("display", "wap")
             , ("response_type", "token")
             ]))
   return (DoGET u (cookiesCreate ()))
 
-showForm :: Shpider.Form -> String
-showForm Shpider.Form{..} =
+printForm :: String -> Shpider.Form -> String
+printForm prefix Shpider.Form{..} =
   let
     telln x = tell (x ++ "\n")
   in
   execWriter $ do
-    telln $ "Form " ++ (show method)
+    telln $ prefix ++ "Form #" ++ " (" ++ (show method) ++ ") Action " ++ action
     forM_ (Map.toList inputs) $ \(input,value) -> do
-      telln $ "\t" ++ input ++ ":" ++ (if null value then "<empty>" else value)
-    telln $ "Action " ++ action
+      telln $ prefix ++ "\t" ++ input ++ ":" ++ (if null value then "<empty>" else value)
 
 fillForm :: (MonadLogin (m (R m x)) (R m x) s) => Form -> Login m x FilledForm
 fillForm (Form f) = do
     LoginState{..} <- toLoginState <$> get
+    Options{..} <- pure ls_options
     fis <- forM (Map.toList (Shpider.inputs f)) $ \(input,value) -> do
       case lookup input ls_formdata of
         Just value' -> do
@@ -107,18 +115,40 @@ fillForm (Form f) = do
             True -> do
               value' <- raise (\k -> UnexpectedFormField (Form f) input k)
               return (input, value')
-    return $ FilledForm (f{Shpider.inputs = Map.fromList fis})
+    -- Replace HTTPS with HTTP if not using TLS
+    let action' = (if o_use_https == False && isPrefixOf "https" (Shpider.action f) then
+                     "http" ++ (fromJust $ stripPrefix "https" (Shpider.action f))
+                   else
+                     Shpider.action f)
+    return $ FilledForm (f{Shpider.inputs = Map.fromList fis, Shpider.action = action'})
 
 actionRequest :: (MonadLogin (m (R m x)) (R m x) s) => RobotAction -> Login m x (Response, Cookies)
-actionRequest (DoGET url jar) = do
-  LoginState{..} <- toLoginState <$> get
-  req <- ensure $ pure $ requestCreate url jar
+actionRequest a@(DoGET url jar) = do
+  liftIO $ putStrLn $ printAction "> " a
+  req <- ensure $ requestCreateGet url jar
   (res, jar') <- requestExecute req jar
+  return (res, jar')
+actionRequest a@(DoPOST form jar) = do
+  liftIO $ putStrLn $ printAction "> " a
+  req <- ensure $ requestCreatePost form jar
+  (res, jar') <- requestExecute req jar
+  return (res, jar')
+
+analyzeResponse :: (MonadLogin (m (R m x)) (R m x) s) => (Response, Cookies) -> Login m x (Either RobotAction ())
+analyzeResponse (res, jar) = do
+  LoginState{..} <- toLoginState <$> get
   let forms = map Form $ (Tagsoup.parseTags >>> Shpider.gatherForms) (responseBody res)
-  forM_ forms $ \f -> do
-    ff <- fillForm f
-    liftIO $ putStrLn $ showForm $ fform ff
-  return (res,jar')
-actionRequest (DoPOST form jar) = do
-  undefined
+  case forms of
+    [] -> do
+      terminate LoginActionsExhausted
+    (f:[]) -> do
+       liftIO $ putStrLn $ printForm "< 0 " $ form f
+       ff <- fillForm f
+       return $ Left (DoPOST ff jar)
+    fs -> do
+      forM_ (fs`zip`[0..]) $ \(f,n) -> do
+        ff <- fillForm f
+        liftIO $ putStrLn $ printForm ("< " ++ (show n) ++ " ") $ fform ff
+      terminate LoginActionsExhausted
+
 

@@ -5,7 +5,7 @@ import Web.VKHS.Client (Response, Request, URL)
 import qualified Web.VKHS.Client as Client
 
 data Error = ETimeout | EClient Client.Error
-  deriving(Show, Eq, Ord)
+  deriving(Show, Eq)
 
 type R t a = Result t a
 
@@ -17,17 +17,18 @@ data Result t a =
   | UnexpectedRequest Client.Error (Request -> t (R t a) (R t a))
   | UnexpectedResponse Client.Error (Response -> t (R t a) (R t a))
   | UnexpectedFormField Form String (String -> t (R t a) (R t a))
+  | LoginActionsExhausted
 
 data ResultDescription a =
     DescFine a
-  | DescVKError Error
-  | DescClientError Client.Error
+  | DescError String
   deriving(Show)
 
-describeResult :: Result t a -> ResultDescription a
-describeResult (Fine a) = DescFine a
-describeResult (UnexpectedInt e k) = DescVKError e
-describeResult (UnexpectedBool e k) = DescVKError e
-describeResult (UnexpectedURL e k) = DescClientError e
-describeResult (UnexpectedRequest e k) = DescClientError e
+describeResult :: (Show a) => Result t a -> String
+describeResult (Fine a) = "Fine " ++ show a
+describeResult (UnexpectedInt e k) = "UnexpectedInt " ++ (show e)
+describeResult (UnexpectedBool e k) = "UnexpectedBool " ++  (show e)
+describeResult (UnexpectedURL e k) = "UnexpectedURL " ++ (show e)
+describeResult (UnexpectedRequest e k) = "UnexpectedRequest " ++ (show e)
+describeResult LoginActionsExhausted = "LoginActionsExhausted"
 

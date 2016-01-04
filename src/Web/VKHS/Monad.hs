@@ -49,6 +49,12 @@ raise z = callCC $ \k -> do
   err (z k)
   undefined
 
+terminate :: (MonadVK m r) => r -> m a
+terminate r = do
+  err <- ask
+  err r
+  undefined
+
 class MonadVK (t r) r => EnsureVK t r c a | c -> a where
   ensure :: t r c -> t r a
 

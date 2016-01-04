@@ -1,4 +1,5 @@
 -- module Main where
+module VKQ where
 
 import Web.VKHS
 

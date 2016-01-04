@@ -11,11 +11,14 @@ import Data.Maybe
 import Data.Time
 import Data.Either
 import Control.Applicative
+import Control.Arrow ((***))
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Cont
 import Data.Default.Class
 import qualified Data.CaseInsensitive as CI
+import Data.Map (Map)
+import qualified Data.Map as Map
 
 import System.IO.Unsafe
 
@@ -29,15 +32,21 @@ import qualified Network.HTTP.Types as Client
 import qualified Network.HTTP.Client as Client
 import qualified Network.HTTP.Client.Internal as Client
 import qualified Network.URI as Client
+import qualified Network.Shpider.Forms as Shpider
 
 import Pipes.Prelude as PP  (foldM)
 import Pipes as Pipes (Producer(..), for, runEffect, (>->))
 import Pipes.HTTP as Pipes hiding (Request, Response)
 
+import qualified Text.Parsec as Parsec
+
 import Debug.Trace
 
-data Error = Error String
-  deriving(Show, Ord, Eq)
+import Web.VKHS.Types
+
+data Error = ErrorParseURL { euri :: String, emsg :: String }
+           | ErrorSetURL { eurl :: URL, emsg :: String }
+  deriving(Show, Eq)
 
 {-
  __  __                       _
@@ -51,10 +60,11 @@ data ClientState = ClientState {
     cl_man :: Client.Manager
   }
 
-defaultState :: IO ClientState
-defaultState = do
-  -- cl_man <- Client.newManager Client.defaultManagerSettings
-  cl_man <- Client.newManager tlsManagerSettings
+defaultState :: Options -> IO ClientState
+defaultState Options{..} = do
+  cl_man <- (case o_use_https of
+              True -> Client.newManager tlsManagerSettings
+              False -> Client.newManager Client.defaultManagerSettings)
   return ClientState{..}
 
 class ToClientState s where
@@ -126,16 +136,27 @@ cookiesCreate () = Cookies (Client.createCookieJar [])
 
 newtype Request = Request { req :: Client.Request }
 
-requestCreate :: URL -> Cookies -> Either Error Request
-requestCreate URL{..} Cookies{..} = do
+requestCreateGet :: (MonadClient m s) => URL -> Cookies -> m (Either Error Request)
+requestCreateGet URL{..} Cookies{..} = do
   case setUri def uri of
-    Left exc -> Left $ Error (show exc)
-    Right r ->
-      let
-        now = unsafePerformIO getCurrentTime
-        (r',_) = Client.insertCookiesIntoRequest r jar now
-      in
-      return (Request r'{redirectCount = 0})
+    Left exc -> do
+      return $ Left $ ErrorSetURL (URL uri) (show exc)
+    Right r -> do
+      now <- liftIO getCurrentTime
+      (r',_) <- pure $ Client.insertCookiesIntoRequest r jar now
+      return $ Right $ Request r'
+
+requestCreatePost :: (MonadClient m s) => FilledForm -> Cookies -> m (Either Error Request)
+requestCreatePost (FilledForm Shpider.Form{..}) c = do
+  case Client.parseURI (Client.escapeURIString Client.isAllowedInURI action) of
+    Nothing -> return (Left (ErrorParseURL action "parseURI failed"))
+    Just action_uri -> do
+      r <- requestCreateGet (URL action_uri) c
+      case r of
+        Left err -> do
+          return $ Left err
+        Right Request{..} -> do
+          return $ Right $ Request $ urlEncodedBody (map (BS.pack *** BS.pack) $ Map.toList inputs) req
 
 data Response = Response {
     resp :: Client.Response (Pipes.Producer ByteString IO ())
