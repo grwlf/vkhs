@@ -91,10 +91,14 @@ defaultOptions = Options {
   }
 
 
-data Form = Form { form :: Shpider.Form }
-  deriving(Show)
+data Form = Form {
+    form_title :: String
+  , form :: Shpider.Form
+  } deriving(Show)
 
-data FilledForm = FilledForm { fform :: Shpider.Form }
-  deriving(Show)
+data FilledForm = FilledForm {
+    fform_title :: String
+  , fform :: Shpider.Form
+  } deriving(Show)
 
 

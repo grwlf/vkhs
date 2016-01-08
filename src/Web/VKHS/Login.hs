@@ -99,7 +99,7 @@ printForm prefix Shpider.Form{..} =
       telln $ prefix ++ "\t" ++ input ++ ":" ++ (if null value then "<empty>" else value)
 
 fillForm :: (MonadLogin (m (R m x)) (R m x) s) => Form -> Login m x FilledForm
-fillForm (Form f) = do
+fillForm (Form tit f) = do
     LoginState{..} <- toLoginState <$> get
     Options{..} <- pure ls_options
     fis <- forM (Map.toList (Shpider.inputs f)) $ \(input,value) -> do
@@ -113,14 +113,14 @@ fillForm (Form f) = do
               -- trace "Using default value for " ++ input ++ " (" ++ value ++ ")" $ do
               return (input, value)
             True -> do
-              value' <- raise (\k -> UnexpectedFormField (Form f) input k)
+              value' <- raise (\k -> UnexpectedFormField (Form tit f) input k)
               return (input, value')
     -- Replace HTTPS with HTTP if not using TLS
     let action' = (if o_use_https == False && isPrefixOf "https" (Shpider.action f) then
                      "http" ++ (fromJust $ stripPrefix "https" (Shpider.action f))
                    else
                      Shpider.action f)
-    return $ FilledForm (f{Shpider.inputs = Map.fromList fis, Shpider.action = action'})
+    return $ FilledForm tit f{Shpider.inputs = Map.fromList fis, Shpider.action = action'}
 
 actionRequest :: (MonadLogin (m (R m x)) (R m x) s) => RobotAction -> Login m x (Response, Cookies)
 actionRequest a@(DoGET url jar) = do
@@ -137,7 +137,11 @@ actionRequest a@(DoPOST form jar) = do
 analyzeResponse :: (MonadLogin (m (R m x)) (R m x) s) => (Response, Cookies) -> Login m x (Either RobotAction ())
 analyzeResponse (res, jar) = do
   LoginState{..} <- toLoginState <$> get
-  let forms = map Form $ (Tagsoup.parseTags >>> Shpider.gatherForms) (responseBody res)
+  let tags = Tagsoup.parseTags (responseBody res)
+      title = Shpider.gatherTitle tags
+      forms = map (Form title) (Shpider.gatherForms tags)
+  liftIO $ writeFile "latest.html" (responseBody res)
+  liftIO $ putStrLn $ "< 0 Title: " ++ title
   case forms of
     [] -> do
       terminate LoginActionsExhausted

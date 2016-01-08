@@ -32,10 +32,18 @@ module Network.Shpider.Forms
    , allForms
    , toForm
    , mkForm
+   , gatherTitle
    )
    where
 
 import Data.Maybe
+
+
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+
+import Data.String.UTF8 as U (UTF8(..))
+import qualified Data.String.UTF8 as U
 
 import qualified Data.Map as M
 
@@ -84,6 +92,20 @@ mkForm a m ps =
 gatherForms :: [ Tag String ] -> [ Form ]
 gatherForms =
    tParse allForms
+
+gatherTitle :: [Tag String] -> String
+gatherTitle ts = head $ tParse allTitles ts
+
+allTitles :: TagParser String [String]
+allTitles = do
+   fs <- allWholeTags "title"
+   return $ mapMaybe (
+    \(TagOpen "title" _ , innerTags , _ ) ->
+      return $ concat $ map (\t -> case t of
+        TagText t -> t
+        _ -> []
+        ) innerTags
+    ) fs
 
 -- | The `TagParser` which parses all forms.
 allForms :: TagParser String [ Form ]

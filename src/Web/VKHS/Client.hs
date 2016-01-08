@@ -147,7 +147,7 @@ requestCreateGet URL{..} Cookies{..} = do
       return $ Right $ Request r'
 
 requestCreatePost :: (MonadClient m s) => FilledForm -> Cookies -> m (Either Error Request)
-requestCreatePost (FilledForm Shpider.Form{..}) c = do
+requestCreatePost (FilledForm tit Shpider.Form{..}) c = do
   case Client.parseURI (Client.escapeURIString Client.isAllowedInURI action) of
     Nothing -> return (Left (ErrorParseURL action "parseURI failed"))
     Just action_uri -> do

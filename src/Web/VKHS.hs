@@ -62,7 +62,7 @@ test_loop m = do
     UnexpectedInt e k -> do
       liftIO (putStrLn "Int!")
       test_loop (k 0)
-    UnexpectedFormField (Form f) i k -> do
+    UnexpectedFormField (Form tit f) i k -> do
       v <- liftIO $ do
         putStrLn $ "While filling form " ++ (printForm "" f)
         putStrLn $ "Please, enter the correct value for input " ++ i ++ " : "
