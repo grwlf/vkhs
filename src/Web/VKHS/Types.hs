@@ -76,19 +76,19 @@ data Options = Options {
   , o_use_https :: Bool
   } deriving(Show)
 
+defaultOptions = Options {
+    o_host = "oauth.vk.com"
+  , o_port = 443
+  , o_verbose = False
+  , o_use_https = True
+  }
+
 -- defaultOptions = Options {
 --     o_host = "oauth.vk.com"
---   , o_port = 443
+--   , o_port = 80
 --   , o_verbose = False
 --   , o_use_https = False
 --   }
-
-defaultOptions = Options {
-    o_host = "oauth.vk.com"
-  , o_port = 80
-  , o_verbose = False
-  , o_use_https = False
-  }
 
 
 data Form = Form {

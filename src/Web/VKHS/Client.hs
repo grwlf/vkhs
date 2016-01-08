@@ -166,6 +166,9 @@ data Response = Response {
 responseBody :: Response -> String
 responseBody Response{..} = BS.unpack $ resp_body
 
+dumpResponseBody :: (MonadClient m s) => FilePath -> Response -> m ()
+dumpResponseBody f Response{..} = liftIO $ BS.writeFile f resp_body
+
 responseCookies :: Response -> Cookies
 responseCookies Response{..} = Cookies (responseCookieJar resp)
 

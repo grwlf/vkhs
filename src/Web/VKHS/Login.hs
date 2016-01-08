@@ -140,7 +140,7 @@ analyzeResponse (res, jar) = do
   let tags = Tagsoup.parseTags (responseBody res)
       title = Shpider.gatherTitle tags
       forms = map (Form title) (Shpider.gatherForms tags)
-  liftIO $ writeFile "latest.html" (responseBody res)
+  dumpResponseBody "latest.html" res
   liftIO $ putStrLn $ "< 0 Title: " ++ title
   case forms of
     [] -> do
