@@ -94,7 +94,7 @@ gatherForms =
    tParse allForms
 
 gatherTitle :: [Tag String] -> String
-gatherTitle ts = head $ tParse allTitles ts
+gatherTitle ts = case tParse allTitles ts of { [] -> "" ; x:_ -> x }
 
 allTitles :: TagParser String [String]
 allTitles = do

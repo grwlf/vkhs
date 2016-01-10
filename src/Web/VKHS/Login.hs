@@ -142,17 +142,25 @@ analyzeResponse (res, jar) = do
       forms = map (Form title) (Shpider.gatherForms tags)
   dumpResponseBody "latest.html" res
   liftIO $ putStrLn $ "< 0 Title: " ++ title
-  case forms of
-    [] -> do
-      terminate LoginActionsExhausted
-    (f:[]) -> do
-       liftIO $ putStrLn $ printForm "< 0 " $ form f
-       ff <- fillForm f
-       return $ Left (DoPOST ff jar)
-    fs -> do
-      forM_ (fs`zip`[0..]) $ \(f,n) -> do
-        ff <- fillForm f
-        liftIO $ putStrLn $ printForm ("< " ++ (show n) ++ " ") $ fform ff
-      terminate LoginActionsExhausted
+
+  case (responseRedirect res) of
+    Just url -> do
+      liftIO $ putStrLn $ "< 0 Fragments: " ++ show (urlFragments url)
+      case lookup "access_token" (urlFragments url) of
+        Just at -> return (Right ())
+        Nothing -> return (Left $ DoGET url jar)
+    Nothing -> do
+      case forms of
+        [] -> do
+          terminate LoginActionsExhausted
+        (f:[]) -> do
+           liftIO $ putStrLn $ printForm "< 0 " $ form f
+           ff <- fillForm f
+           return $ Left (DoPOST ff jar)
+        fs -> do
+          forM_ (fs`zip`[0..]) $ \(f,n) -> do
+            ff <- fillForm f
+            liftIO $ putStrLn $ printForm ("< " ++ (show n) ++ " ") $ fform ff
+          terminate LoginActionsExhausted
 
 

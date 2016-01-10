@@ -3,6 +3,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Web.VKHS where
 
 import Data.List
@@ -72,14 +73,12 @@ test_loop m = do
       putStrLn $ describeResult res
       return Nothing
 
-test_run = initialState >>= evalStateT (test_loop $ do
-  a <- initialAction
-  trace (show a) $ do
-  r <- actionRequest a
-  Left a2 <- analyzeResponse r
-  r2 <- actionRequest a2
-  Left a3 <- analyzeResponse r2
-  r3 <- actionRequest a3
-  return $ Fine ()
-  )
+test_run = initialState >>= evalStateT (test_loop (initialAction >>= go)) where
+  go a = do
+    req <- actionRequest a
+    res <- analyzeResponse req
+    trace (show res) $ do
+    case res of
+      Left a' -> go a'
+      Right _ -> return (Fine ())
 

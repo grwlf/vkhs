@@ -19,6 +19,7 @@ import Data.Default.Class
 import qualified Data.CaseInsensitive as CI
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.List.Split
 
 import System.IO.Unsafe
 
@@ -34,9 +35,9 @@ import qualified Network.HTTP.Client.Internal as Client
 import qualified Network.URI as Client
 import qualified Network.Shpider.Forms as Shpider
 
-import Pipes.Prelude as PP  (foldM)
-import Pipes as Pipes (Producer(..), for, runEffect, (>->))
-import Pipes.HTTP as Pipes hiding (Request, Response)
+import Pipes.Prelude as PP (foldM)
+import qualified Pipes as Pipes (Producer(..), for, runEffect, (>->))
+import qualified Pipes.HTTP as Pipes hiding (Request, Response)
 
 import qualified Text.Parsec as Parsec
 
@@ -112,6 +113,24 @@ urlCreate :: URL_Protocol -> URL_Host -> Maybe URL_Port -> URL_Path -> URL_Query
 urlCreate URL_Protocol{..} URL_Host{..} port  URL_Path{..} URL_Query{..} =
   pure $ URL $ Client.URI (urlproto ++ ":") (Just (Client.URIAuth "" urlh (maybe "" ((":"++).urlp) port))) urlpath urlq []
 
+urlFragments :: URL -> [(String,String)]
+urlFragments URL{..} = parser $  unsharp $ Client.uriFragment uri where
+  unsharp ('#':x) = x
+  unsharp y = y
+  trim = rev (dropWhile (`elem` (" \t\n\r" :: String)))
+    where rev f = reverse . f . reverse . f
+  sep = "&"
+  eqs = "="
+  parser =
+      filter (\(a, b) -> not (null a))
+    . map (f . splitOn eqs)
+    . concat
+    . map (splitOn sep)
+    . lines
+    where f []     = ("", "")
+          f [x]    = (trim x, "")
+          f (x:xs) = (trim x, trim $ intercalate eqs xs)
+
 {-
   ____            _    _
  / ___|___   ___ | | _(_) ___
@@ -144,7 +163,10 @@ requestCreateGet URL{..} Cookies{..} = do
     Right r -> do
       now <- liftIO getCurrentTime
       (r',_) <- pure $ Client.insertCookiesIntoRequest r jar now
-      return $ Right $ Request r'
+      return $ Right $ Request r'{
+          Client.redirectCount = 0
+        , Client.checkStatus = \_ _ _ -> Nothing
+        }
 
 requestCreatePost :: (MonadClient m s) => FilledForm -> Cookies -> m (Either Error Request)
 requestCreatePost (FilledForm tit Shpider.Form{..}) c = do
@@ -156,7 +178,7 @@ requestCreatePost (FilledForm tit Shpider.Form{..}) c = do
         Left err -> do
           return $ Left err
         Right Request{..} -> do
-          return $ Right $ Request $ urlEncodedBody (map (BS.pack *** BS.pack) $ Map.toList inputs) req
+          return $ Right $ Request $ Client.urlEncodedBody (map (BS.pack *** BS.pack) $ Map.toList inputs) req
 
 data Response = Response {
     resp :: Client.Response (Pipes.Producer ByteString IO ())
@@ -170,7 +192,7 @@ dumpResponseBody :: (MonadClient m s) => FilePath -> Response -> m ()
 dumpResponseBody f Response{..} = liftIO $ BS.writeFile f resp_body
 
 responseCookies :: Response -> Cookies
-responseCookies Response{..} = Cookies (responseCookieJar resp)
+responseCookies Response{..} = Cookies (Client.responseCookieJar resp)
 
 responseHeaders :: Response -> [(String,String)]
 responseHeaders Response{..} =
@@ -182,6 +204,12 @@ responseCode Response{..} = Client.statusCode $ Client.responseStatus resp
 responseCodeMessage :: Response -> String
 responseCodeMessage Response{..} = BS.unpack $ Client.statusMessage $ Client.responseStatus resp
 
+responseRedirect :: Response -> Maybe URL
+responseRedirect r =
+  case lookup "Location" (responseHeaders r) of
+    Just loc -> URL <$> Client.parseURI loc
+    Nothing -> Nothing
+
 responseOK :: Response -> Bool
 responseOK r = c == 200 where
   c = responseCode r
@@ -189,9 +217,9 @@ responseOK r = c == 200 where
 requestExecute :: (MonadClient m s) => Request -> Cookies -> m (Response, Cookies)
 requestExecute Request{..} Cookies{..} = do
   ClientState{..} <- toClientState <$> get
-  liftIO $ withHTTP req cl_man $ \resp -> do
+  liftIO $ Pipes.withHTTP req cl_man $ \resp -> do
     resp_body <- PP.foldM (\a b -> return $ BS.append a b) (return BS.empty) return (Client.responseBody resp)
     now <- getCurrentTime
-    let (jar', resp') = updateCookieJar resp req now jar
+    let (jar', resp') = Client.updateCookieJar resp req now jar
     return (Response resp resp_body, Cookies jar')
 
