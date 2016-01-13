@@ -41,7 +41,9 @@ library
                      parsec,
                      tagsoup,
                      case-insensitive,
-                     http-types
+                     http-types,
+                     split,
+                     utf8-string
 
 
 executable vkq
