@@ -61,8 +61,8 @@ data ClientState = ClientState {
     cl_man :: Client.Manager
   }
 
-defaultState :: Options -> IO ClientState
-defaultState Options{..} = do
+defaultState :: GenericOptions -> IO ClientState
+defaultState GenericOptions{..} = do
   cl_man <- (case o_use_https of
               True -> Client.newManager tlsManagerSettings
               False -> Client.newManager Client.defaultManagerSettings)

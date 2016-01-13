@@ -9,43 +9,7 @@ import Options.Applicative
 import System.Environment
 
 import Web.VKHS
-
-data Verbosity = Normal | Trace | Debug
-  deriving(Enum,Eq,Ord,Show)
-
-data LoginOptions = LoginOptions {
-    l_appid :: String
-  , l_username :: String
-  , l_password :: String
-  } deriving(Show)
-
-data CallOptions = CallOptions {
-    c_accessToken :: String
-  , c_parse :: Bool
-  , c_method :: String
-  , c_args :: String
-  } deriving(Show)
-
-data MusicOptions = MusicOptions {
-    m_accessToken :: String
-  , m_list_music :: Bool
-  , m_search_string :: String
-  , m_name_format :: String
-  , m_output_format :: String
-  , m_out_dir :: String
-  , m_records_id :: [String]
-  , m_skip_existing :: Bool
-  } deriving(Show)
-
-data UserOptions = UserOptions {
-    u_accessToken :: String
-  , u_queryString :: String
-  } deriving(Show)
-
-data WallOptions = WallOptions {
-    w_accessToken :: String
-  , w_woid :: String
-  } deriving(Show)
+import Web.VKHS.Types
 
 data CmdOptions
   = Login LoginOptions
@@ -62,7 +26,7 @@ data Options = Options {
 
 loginOptions :: Parser CmdOptions
 loginOptions = Login <$> (LoginOptions
-  <$> strOption (metavar "APPID" <> short 'a' <> value "3128877" <> help "Application ID, defaults to VKHS" )
+  <$> (AppID <$> strOption (metavar "APPID" <> short 'a' <> value "3128877" <> help "Application ID, defaults to VKHS" ))
   <*> argument str (metavar "USER" <> help "User name or email")
   <*> argument str (metavar "PASS" <> help "User password"))
 
@@ -115,8 +79,6 @@ opts m =
       ( progDesc "Extract wall information"))
     )
 
-
-
 main :: IO ()
 main = do
   m <- maybe (idm) (value) <$> lookupEnv "VKQ_ACCESS_TOKEN"
@@ -128,9 +90,8 @@ main = do
 cmd :: Options -> IO ()
 
 -- Login
-cmd (Options v (Login (LoginOptions{..}))) = do
-  test_run
+cmd (Options v (Login lo)) = do
+  runLogin lo
   return ()
-
 
 

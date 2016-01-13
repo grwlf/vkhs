@@ -40,14 +40,14 @@ data LoginState = LoginState {
   -- ^ Application ID provided by vk.com
   , ls_formdata :: [(String,String)]
   -- ^ Dictionary containig inputID/value map for filling forms
-  , ls_options :: Options
+  , ls_options :: GenericOptions
   } deriving (Show)
 
-defaultState o = LoginState {
+defaultState go LoginOptions{..} = LoginState {
     ls_rights = allAccess
-  , ls_appid = (AppID "3128877")
-  , ls_formdata = []
-  , ls_options = o
+  , ls_appid = l_appid
+  , ls_formdata = [("email", l_username), ("pass", l_password)]
+  , ls_options = go
   }
 
 class ToLoginState s where
@@ -68,7 +68,7 @@ type Login m x a = m (R m x) a
 initialAction :: (MonadLogin (m (R m x)) (R m x) s) => Login m x RobotAction
 initialAction = do
   LoginState{..} <- toLoginState <$> get
-  Options{..} <- pure ls_options
+  GenericOptions{..} <- pure ls_options
   let
     protocol = (case o_use_https of
                   True -> "https"
@@ -101,7 +101,7 @@ printForm prefix Shpider.Form{..} =
 fillForm :: (MonadLogin (m (R m x)) (R m x) s) => Form -> Login m x FilledForm
 fillForm (Form tit f) = do
     LoginState{..} <- toLoginState <$> get
-    Options{..} <- pure ls_options
+    GenericOptions{..} <- pure ls_options
     fis <- forM (Map.toList (Shpider.inputs f)) $ \(input,value) -> do
       case lookup input ls_formdata of
         Just value' -> do
@@ -134,7 +134,7 @@ actionRequest a@(DoPOST form jar) = do
   (res, jar') <- requestExecute req jar
   return (res, jar')
 
-analyzeResponse :: (MonadLogin (m (R m x)) (R m x) s) => (Response, Cookies) -> Login m x (Either RobotAction ())
+analyzeResponse :: (MonadLogin (m (R m x)) (R m x) s) => (Response, Cookies) -> Login m x (Either RobotAction AccessToken)
 analyzeResponse (res, jar) = do
   LoginState{..} <- toLoginState <$> get
   let tags = Tagsoup.parseTags (responseBody res)
@@ -146,9 +146,11 @@ analyzeResponse (res, jar) = do
   case (responseRedirect res) of
     Just url -> do
       liftIO $ putStrLn $ "< 0 Fragments: " ++ show (urlFragments url)
-      case lookup "access_token" (urlFragments url) of
-        Just at -> return (Right ())
-        Nothing -> return (Left $ DoGET url jar)
+      maybe (return $ Left $ DoGET url jar) (\x -> return $ Right x) $ do
+        at_access_token <- lookup "access_token" (urlFragments url)
+        at_user_id <-  lookup "user_id" (urlFragments url)
+        at_expires_in <-  lookup "expires_in" (urlFragments url)
+        return AccessToken{..}
     Nothing -> do
       case forms of
         [] -> do
@@ -163,4 +165,13 @@ analyzeResponse (res, jar) = do
             liftIO $ putStrLn $ printForm ("< " ++ (show n) ++ " ") $ fform ff
           terminate LoginActionsExhausted
 
+login :: (MonadLogin (m (R m x)) (R m x) s) => Login m x AccessToken
+login = initialAction >>= go where
+  go a = do
+    req <- actionRequest a
+    res <- analyzeResponse req
+    trace (show res) $ do
+    case res of
+      Left a' -> go a'
+      Right at -> return at
 

@@ -11,8 +11,11 @@ import qualified Network.Shpider.Forms as Shpider
 --
 -- See http://vk.com/developers.php?oid=-1&p=Авторизация_клиентских_приложений
 -- (in Russian) for more details
-newtype AccessToken = AccessToken (String,String,String)
-  deriving(Show, Eq, Ord)
+data AccessToken = AccessToken {
+    at_access_token :: String
+  , at_user_id :: String
+  , at_expires_in :: String
+  } deriving(Show, Eq, Ord)
 
 -- | Access rigth to request from VK.
 -- See API docs http://vk.com/developers.php?oid=-1&p=Права_доступа_приложений (in
@@ -69,14 +72,14 @@ allAccess =
 newtype AppID = AppID { aid_string :: String }
   deriving(Show, Eq, Ord)
 
-data Options = Options {
+data GenericOptions = GenericOptions {
     o_host :: String
   , o_port :: Int
   , o_verbose :: Bool
   , o_use_https :: Bool
   } deriving(Show)
 
-defaultOptions = Options {
+defaultOptions = GenericOptions {
     o_host = "oauth.vk.com"
   , o_port = 443
   , o_verbose = False
@@ -101,4 +104,41 @@ data FilledForm = FilledForm {
   , fform :: Shpider.Form
   } deriving(Show)
 
+
+data Verbosity = Normal | Trace | Debug
+  deriving(Enum,Eq,Ord,Show)
+
+data LoginOptions = LoginOptions {
+    l_appid :: AppID
+  , l_username :: String
+  , l_password :: String
+  } deriving(Show)
+
+data CallOptions = CallOptions {
+    c_accessToken :: String
+  , c_parse :: Bool
+  , c_method :: String
+  , c_args :: String
+  } deriving(Show)
+
+data MusicOptions = MusicOptions {
+    m_accessToken :: String
+  , m_list_music :: Bool
+  , m_search_string :: String
+  , m_name_format :: String
+  , m_output_format :: String
+  , m_out_dir :: String
+  , m_records_id :: [String]
+  , m_skip_existing :: Bool
+  } deriving(Show)
+
+data UserOptions = UserOptions {
+    u_accessToken :: String
+  , u_queryString :: String
+  } deriving(Show)
+
+data WallOptions = WallOptions {
+    w_accessToken :: String
+  , w_woid :: String
+  } deriving(Show)
 
