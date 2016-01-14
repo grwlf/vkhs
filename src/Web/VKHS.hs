@@ -38,6 +38,7 @@ instance ToLoginState State where
   toLoginState = ls
 instance ToClientState State where
   toClientState = cs
+  modifyClientState f = \s -> s { cs = f (cs s) }
 
 initialState :: LoginOptions -> IO State
 initialState lo =

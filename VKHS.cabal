@@ -43,7 +43,8 @@ library
                      case-insensitive,
                      http-types,
                      split,
-                     utf8-string
+                     utf8-string,
+                     clock
 
 
 executable vkq

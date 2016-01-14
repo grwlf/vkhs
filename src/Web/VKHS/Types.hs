@@ -77,6 +77,8 @@ data GenericOptions = GenericOptions {
   , o_port :: Int
   , o_verbose :: Bool
   , o_use_https :: Bool
+  , o_max_request_rate_per_sec :: Rational
+  -- ^ How many requests per second is allowed
   } deriving(Show)
 
 defaultOptions = GenericOptions {
@@ -84,6 +86,7 @@ defaultOptions = GenericOptions {
   , o_port = 443
   , o_verbose = False
   , o_use_https = True
+  , o_max_request_rate_per_sec = 3
   }
 
 -- defaultOptions = Options {

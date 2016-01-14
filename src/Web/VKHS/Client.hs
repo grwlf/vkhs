@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Web.VKHS.Client where
 
 import Data.List
@@ -21,7 +22,11 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.List.Split
 
-import System.IO.Unsafe
+import Control.Concurrent (threadDelay)
+
+import System.IO as IO
+import System.IO.Unsafe as IO
+import System.Clock as Clock
 
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -59,6 +64,8 @@ data Error = ErrorParseURL { euri :: String, emsg :: String }
 
 data ClientState = ClientState {
     cl_man :: Client.Manager
+  , cl_last_execute :: TimeSpec
+  , cl_minimum_interval_ns :: Integer
   }
 
 defaultState :: GenericOptions -> IO ClientState
@@ -66,10 +73,13 @@ defaultState GenericOptions{..} = do
   cl_man <- (case o_use_https of
               True -> Client.newManager tlsManagerSettings
               False -> Client.newManager Client.defaultManagerSettings)
+  cl_last_execute <- pure (TimeSpec 0 0)
+  cl_minimum_interval_ns <- pure (round (10^9  / o_max_request_rate_per_sec))
   return ClientState{..}
 
 class ToClientState s where
   toClientState :: s -> ClientState
+  modifyClientState :: (ClientState -> ClientState) -> (s -> s)
 
 class (MonadIO m, MonadState s m, ToClientState s) => MonadClient m s | m -> s
 
@@ -217,7 +227,17 @@ responseOK r = c == 200 where
 requestExecute :: (MonadClient m s) => Request -> Cookies -> m (Response, Cookies)
 requestExecute Request{..} Cookies{..} = do
   ClientState{..} <- toClientState <$> get
-  liftIO $ Pipes.withHTTP req cl_man $ \resp -> do
+  clk <- liftIO $ do
+    clk <- Clock.getTime Clock.Realtime
+    let interval_ns = timeSpecAsNanoSecs (clk `diffTimeSpec` cl_last_execute)
+    when (interval_ns < cl_minimum_interval_ns) $ do
+      threadDelay (fromInteger $ (cl_minimum_interval_ns - interval_ns) `div` 1000); -- convert ns to us
+    return clk
+
+  modify (modifyClientState (\s -> s{cl_last_execute = clk}))
+
+  liftIO $ do
+    Pipes.withHTTP req cl_man $ \resp -> do
     resp_body <- PP.foldM (\a b -> return $ BS.append a b) (return BS.empty) return (Client.responseBody resp)
     now <- getCurrentTime
     let (jar', resp') = Client.updateCookieJar resp req now jar
