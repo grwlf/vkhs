@@ -11,7 +11,7 @@ import System.Environment
 import Web.VKHS
 import Web.VKHS.Types
 
-data CmdOptions
+data Options
   = Login LoginOptions
   | Call CallOptions
   | Music MusicOptions
@@ -19,23 +19,26 @@ data CmdOptions
   | WallQ WallOptions
   deriving(Show)
 
-data Options = Options {
-    verb :: Verbosity
-  , cmdOpts :: CmdOptions
-  } deriving(Show)
+genericOptions :: Parser GenericOptions
+genericOptions = GenericOptions
+  <$> (pure $ o_host defaultOptions)
+  <*> (pure $ o_port defaultOptions)
+  <*> flag False True (long "verbose" <> help "Be verbose")
+  <*> (pure $ o_use_https defaultOptions)
+  <*> fmap read (strOption (value (show $ o_max_request_rate_per_sec defaultOptions) <> long "req-per-sec" <> metavar "N" <> help "Max number of requests per second"))
+  <*> flag True False (long "interactive" <> help "Allow interactive queries")
 
-loginOptions :: Parser CmdOptions
+loginOptions :: Parser Options
 loginOptions = Login <$> (LoginOptions
-  <$> (AppID <$> strOption (metavar "APPID" <> short 'a' <> value "3128877" <> help "Application ID, defaults to VKHS" ))
+  <$> genericOptions
+  <*> (AppID <$> strOption (metavar "APPID" <> short 'a' <> value "3128877" <> help "Application ID, defaults to VKHS" ))
   <*> argument str (metavar "USER" <> help "User name or email")
   <*> argument str (metavar "PASS" <> help "User password"))
 
 opts m =
   let access_token_flag = strOption (short 'a' <> m <> metavar "ACCESS_TOKEN" <>
         help "Access token. Honores VKQ_ACCESS_TOKEN environment variable")
-  in Options
-  <$> flag Normal Debug (long "verbose" <> help "Be verbose")
-  <*> subparser (
+  in subparser (
     command "login" (info loginOptions
       ( progDesc "Login and print access token (also prints user_id and expiration time)" ))
     <> command "call" (info (Call <$> (CallOptions
@@ -90,7 +93,7 @@ main = do
 cmd :: Options -> IO ()
 
 -- Login
-cmd (Options v (Login lo)) = do
+cmd (Login lo) = do
   runLogin lo
   return ()
 

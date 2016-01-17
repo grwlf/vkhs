@@ -12,7 +12,7 @@ import Data.Time
 import Data.Either
 import Control.Applicative
 import Control.Monad
-import Control.Monad.State (MonadState, execState, evalStateT, StateT(..))
+import Control.Monad.State (MonadState, execState, evalStateT, StateT(..), get)
 import Control.Monad.Cont
 import Control.Monad.Reader
 
@@ -43,8 +43,11 @@ instance ToClientState State where
 
 initialState :: LoginOptions -> IO State
 initialState lo =
-  let go = defaultOptions in
+  let go = l_generic lo in
   State <$> Client.defaultState go <*> pure (Login.defaultState go lo)
+
+getGenericOptions :: (MonadState State m) => m GenericOptions
+getGenericOptions = ls_options <$> ls <$> get
 
 newtype VK r a = VK { unVK :: Guts VK (StateT State IO) r a }
   deriving(MonadIO, Functor, Applicative, Monad, MonadState State, MonadReader (r -> VK r r) , MonadCont)
@@ -61,17 +64,23 @@ runVK m = runContT (runReaderT (unVK (catch m)) undefined) return
 defaultSuperviser :: (Show a) => VK (R VK a) (R VK a) -> StateT State IO (Maybe a)
 defaultSuperviser = go where
   go m = do
+    GenericOptions{..} <- getGenericOptions
     res <- runVK m
     case res of
       UnexpectedInt e k -> do
         liftIO (putStrLn "Int!")
         go (k 0)
       UnexpectedFormField (Form tit f) i k -> do
-        v <- liftIO $ do
-          putStrLn $ "While filling form " ++ (printForm "" f)
-          putStrLn $ "Please, enter the correct value for input " ++ i ++ " : "
-          getLine
-        go (k v)
+          liftIO $ putStrLn $ "While filling form " ++ (printForm "" f)
+          case o_allow_interactive of
+            True -> do
+              v <- liftIO $ do
+                putStrLn $ "Please, enter the correct value for input " ++ i ++ " : "
+                getLine
+              go (k v)
+            False -> do
+              liftIO $ putStrLn $ "Unable to query value for " ++ i ++ " since interactive mode is disabled"
+              return Nothing
       _ -> liftIO $ do
         putStrLn $ describeResult res
         return Nothing

@@ -41,6 +41,7 @@ data LoginState = LoginState {
   , ls_formdata :: [(String,String)]
   -- ^ Dictionary containig inputID/value map for filling forms
   , ls_options :: GenericOptions
+  -- ^ Copy of generic options
   , ls_input_sets :: [[String]]
   -- ^ Empty inputs seen so far.
   } deriving (Show)
