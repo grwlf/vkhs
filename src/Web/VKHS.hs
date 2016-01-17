@@ -36,6 +36,7 @@ data State = State {
 
 instance ToLoginState State where
   toLoginState = ls
+  modifyLoginState f = \s -> s { ls = f (ls s) }
 instance ToClientState State where
   toClientState = cs
   modifyClientState f = \s -> s { cs = f (cs s) }

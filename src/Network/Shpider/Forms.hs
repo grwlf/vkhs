@@ -33,6 +33,7 @@ module Network.Shpider.Forms
    , toForm
    , mkForm
    , gatherTitle
+   , emptyInputs
    )
    where
 
@@ -64,6 +65,9 @@ data Form =
         , inputs :: M.Map String String
         }
    deriving Show
+
+emptyInputs :: Form -> [String]
+emptyInputs = fst . unzip . filter ( not . null . snd )  . M.toList . inputs
 
 -- | Takes a form and fills out the inputs with the given [ ( String , String ) ].
 -- It is convienent to use the `pairs` syntax here.

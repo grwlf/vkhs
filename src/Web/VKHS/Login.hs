@@ -41,6 +41,8 @@ data LoginState = LoginState {
   , ls_formdata :: [(String,String)]
   -- ^ Dictionary containig inputID/value map for filling forms
   , ls_options :: GenericOptions
+  , ls_input_sets :: [[String]]
+  -- ^ Empty inputs seen so far.
   } deriving (Show)
 
 defaultState go LoginOptions{..} = LoginState {
@@ -48,10 +50,12 @@ defaultState go LoginOptions{..} = LoginState {
   , ls_appid = l_appid
   , ls_formdata = [("email", l_username), ("pass", l_password)]
   , ls_options = go
+  , ls_input_sets = []
   }
 
 class ToLoginState s where
   toLoginState :: s -> LoginState
+  modifyLoginState :: (LoginState -> LoginState) -> (s -> s)
 
 class (MonadIO m, MonadClient m s, ToLoginState s, MonadVK m r) => MonadLogin m r s | m -> s
 
@@ -99,10 +103,17 @@ printForm prefix Shpider.Form{..} =
       telln $ prefix ++ "\t" ++ input ++ ":" ++ (if null value then "<empty>" else value)
 
 fillForm :: (MonadLogin (m (R m x)) (R m x) s) => Form -> Login m x FilledForm
-fillForm (Form tit f) = do
+fillForm f@(Form{..}) = do
     LoginState{..} <- toLoginState <$> get
     GenericOptions{..} <- pure ls_options
-    fis <- forM (Map.toList (Shpider.inputs f)) $ \(input,value) -> do
+    let empty_inputs = Shpider.emptyInputs form
+    case empty_inputs `elem` ls_input_sets of
+      False -> do
+        modify $ modifyLoginState (\s -> s{ls_input_sets = empty_inputs:ls_input_sets})
+      True -> do
+        raise (\k -> RepeatedForm f k)
+        return ()
+    fis <- forM (Map.toList (Shpider.inputs form)) $ \(input,value) -> do
       case lookup input ls_formdata of
         Just value' -> do
           -- trace $ "Overwriting default value for " ++ input ++ "( " ++ value ++ ") with " ++ value' $ do
@@ -113,14 +124,14 @@ fillForm (Form tit f) = do
               -- trace "Using default value for " ++ input ++ " (" ++ value ++ ")" $ do
               return (input, value)
             True -> do
-              value' <- raise (\k -> UnexpectedFormField (Form tit f) input k)
+              value' <- raise (\k -> UnexpectedFormField f input k)
               return (input, value')
     -- Replace HTTPS with HTTP if not using TLS
-    let action' = (if o_use_https == False && isPrefixOf "https" (Shpider.action f) then
-                     "http" ++ (fromJust $ stripPrefix "https" (Shpider.action f))
+    let action' = (if o_use_https == False && isPrefixOf "https" (Shpider.action form) then
+                     "http" ++ (fromJust $ stripPrefix "https" (Shpider.action form))
                    else
-                     Shpider.action f)
-    return $ FilledForm tit f{Shpider.inputs = Map.fromList fis, Shpider.action = action'}
+                     Shpider.action form)
+    return $ FilledForm form_title form{Shpider.inputs = Map.fromList fis, Shpider.action = action'}
 
 actionRequest :: (MonadLogin (m (R m x)) (R m x) s) => RobotAction -> Login m x (Response, Cookies)
 actionRequest a@(DoGET url jar) = do

@@ -18,6 +18,7 @@ data Result t a =
   | UnexpectedResponse Client.Error (Response -> t (R t a) (R t a))
   | UnexpectedFormField Form String (String -> t (R t a) (R t a))
   | LoginActionsExhausted
+  | RepeatedForm Form (() -> t (R t a) (R t a))
 
 data ResultDescription a =
     DescFine a
@@ -31,4 +32,5 @@ describeResult (UnexpectedBool e k) = "UnexpectedBool " ++  (show e)
 describeResult (UnexpectedURL e k) = "UnexpectedURL " ++ (show e)
 describeResult (UnexpectedRequest e k) = "UnexpectedRequest " ++ (show e)
 describeResult LoginActionsExhausted = "LoginActionsExhausted"
+describeResult (RepeatedForm f k) = "RepeatedForm"
 
