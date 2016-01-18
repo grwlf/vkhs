@@ -1,12 +1,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 
--- module Main where
-module VKQ where
+module Main where
 
 import Control.Exception (SomeException(..),catch,bracket)
 import Options.Applicative
 import System.Environment
+import System.Exit
 
 import Web.VKHS
 import Web.VKHS.Types
@@ -21,34 +21,44 @@ data Options
 
 genericOptions :: Parser GenericOptions
 genericOptions = GenericOptions
-  <$> (pure $ o_host defaultOptions)
+  <$> (pure $ o_login_host defaultOptions)
+  <*> (pure $ o_api_host defaultOptions)
   <*> (pure $ o_port defaultOptions)
   <*> flag False True (long "verbose" <> help "Be verbose")
   <*> (pure $ o_use_https defaultOptions)
   <*> fmap read (strOption (value (show $ o_max_request_rate_per_sec defaultOptions) <> long "req-per-sec" <> metavar "N" <> help "Max number of requests per second"))
   <*> flag True False (long "interactive" <> help "Allow interactive queries")
 
-loginOptions :: Parser Options
-loginOptions = Login <$> (LoginOptions
+loginOptions :: Parser LoginOptions
+loginOptions = LoginOptions
   <$> genericOptions
   <*> (AppID <$> strOption (metavar "APPID" <> short 'a' <> value "3128877" <> help "Application ID, defaults to VKHS" ))
   <*> argument str (metavar "USER" <> help "User name or email")
-  <*> argument str (metavar "PASS" <> help "User password"))
+  <*> argument str (metavar "PASS" <> help "User password")
+
+loginOptions' :: Parser LoginOptions
+loginOptions' = LoginOptions
+  <$> genericOptions
+  <*> (AppID <$> strOption (metavar "APPID" <> short 'a' <> value "3128877" <> help "Application ID, defaults to VKHS" ))
+  <*> strOption (long "user" <> value "" <> metavar "STR" <> help "User name or email")
+  <*> strOption (long "pass" <> value "" <> metavar "STR" <> help "Password")
 
 opts m =
   let access_token_flag = strOption (short 'a' <> m <> metavar "ACCESS_TOKEN" <>
         help "Access token. Honores VKQ_ACCESS_TOKEN environment variable")
   in subparser (
-    command "login" (info loginOptions
+    command "login" (info (Login <$> loginOptions)
       ( progDesc "Login and print access token (also prints user_id and expiration time)" ))
     <> command "call" (info (Call <$> (CallOptions
-      <$> access_token_flag
+      <$> loginOptions'
+      <*> access_token_flag
       <*> switch (long "preparse" <> short 'p' <> help "Preparse into Aeson format")
       <*> argument str (metavar "METHOD" <> help "Method name")
       <*> argument str (metavar "PARAMS" <> help "Method arguments, KEY=VALUE[,KEY2=VALUE2[,,,]]")))
       ( progDesc "Call VK API method" ))
     <> command "music" (info ( Music <$> (MusicOptions
-      <$> access_token_flag
+      <$> loginOptions'
+      <*> access_token_flag
       <*> switch (long "list" <> short 'l' <> help "List music files")
       <*> strOption
         ( metavar "STR"
@@ -71,12 +81,14 @@ opts m =
       ))
       ( progDesc "List or download music files"))
     <> command "user" (info ( UserQ <$> (UserOptions
-      <$> access_token_flag
+      <$> loginOptions'
+      <*> access_token_flag
       <*> strOption (long "query" <> short 'q' <> help "String to query")
       ))
       ( progDesc "Extract various user information"))
     <> command "wall" (info ( WallQ <$> (WallOptions
-      <$> access_token_flag
+      <$> loginOptions'
+      <*> access_token_flag
       <*> strOption (long "id" <> short 'i' <> help "Owner id")
       ))
       ( progDesc "Extract wall information"))
@@ -94,7 +106,12 @@ cmd :: Options -> IO ()
 
 -- Login
 cmd (Login lo) = do
-  runLogin lo
-  return ()
+  acc <- runLogin lo
+  case acc of
+    Just (AccessToken{..}) -> do
+      putStrLn at_access_token
+      exitSuccess
+    Nothing -> do
+      exitFailure
 
 

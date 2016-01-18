@@ -26,6 +26,7 @@ library
                      Web.VKHS.Monad
                      Web.VKHS.Client
                      Web.VKHS.Login
+                     Web.VKHS.API
 
   build-depends:     base >=4.6 && <5,
                      containers,
@@ -44,11 +45,12 @@ library
                      http-types,
                      split,
                      utf8-string,
-                     clock
+                     clock,
+                     optparse-applicative
 
 
 executable vkq
-  hs-source-dirs:    src
-  main-is:           VKQ.hs
+  hs-source-dirs:    app/vkq, src
+  main-is:           Main.hs
 
 

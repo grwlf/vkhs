@@ -40,21 +40,19 @@ data LoginState = LoginState {
   -- ^ Application ID provided by vk.com
   , ls_formdata :: [(String,String)]
   -- ^ Dictionary containig inputID/value map for filling forms
-  , ls_options :: GenericOptions
-  -- ^ Copy of generic options
   , ls_input_sets :: [[String]]
   -- ^ Empty inputs seen so far.
   } deriving (Show)
 
-defaultState go LoginOptions{..} = LoginState {
+defaultState LoginOptions{..} = LoginState {
     ls_rights = allAccess
   , ls_appid = l_appid
-  , ls_formdata = [("email", l_username), ("pass", l_password)]
-  , ls_options = go
+  , ls_formdata = (if not (null l_username) then [("email", l_username)] else [])
+               ++ (if not (null l_password) then [("pass", l_password)] else [])
   , ls_input_sets = []
   }
 
-class ToLoginState s where
+class ToGenericOptions s => ToLoginState s where
   toLoginState :: s -> LoginState
   modifyLoginState :: (LoginState -> LoginState) -> (s -> s)
 
@@ -73,7 +71,7 @@ type Login m x a = m (R m x) a
 initialAction :: (MonadLogin (m (R m x)) (R m x) s) => Login m x RobotAction
 initialAction = do
   LoginState{..} <- toLoginState <$> get
-  GenericOptions{..} <- pure ls_options
+  GenericOptions{..} <- toGenericOptions <$> get
   let
     protocol = (case o_use_https of
                   True -> "https"
@@ -81,7 +79,7 @@ initialAction = do
   u <- ensure $ pure
         (urlCreate
           (URL_Protocol protocol)
-          (URL_Host o_host)
+          (URL_Host o_login_host)
           (Just (URL_Port (show o_port)))
           (URL_Path "/authorize")
           (buildQuery [
@@ -106,7 +104,7 @@ printForm prefix Shpider.Form{..} =
 fillForm :: (MonadLogin (m (R m x)) (R m x) s) => Form -> Login m x FilledForm
 fillForm f@(Form{..}) = do
     LoginState{..} <- toLoginState <$> get
-    GenericOptions{..} <- pure ls_options
+    GenericOptions{..} <- toGenericOptions <$> get
     let empty_inputs = Shpider.emptyInputs form
     case empty_inputs `elem` ls_input_sets of
       False -> do
@@ -138,12 +136,12 @@ actionRequest :: (MonadLogin (m (R m x)) (R m x) s) => RobotAction -> Login m x 
 actionRequest a@(DoGET url jar) = do
   liftIO $ putStrLn $ printAction "> " a
   req <- ensure $ requestCreateGet url jar
-  (res, jar') <- requestExecute req jar
+  (res, jar') <- requestExecute req
   return (res, jar')
 actionRequest a@(DoPOST form jar) = do
   liftIO $ putStrLn $ printAction "> " a
   req <- ensure $ requestCreatePost form jar
-  (res, jar') <- requestExecute req jar
+  (res, jar') <- requestExecute req
   return (res, jar')
 
 analyzeResponse :: (MonadLogin (m (R m x)) (R m x) s) => (Response, Cookies) -> Login m x (Either RobotAction AccessToken)
@@ -182,7 +180,7 @@ login = initialAction >>= go where
   go a = do
     req <- actionRequest a
     res <- analyzeResponse req
-    trace (show res) $ do
+    -- trace (show res) $ do
     case res of
       Left a' -> go a'
       Right at -> return at

@@ -163,7 +163,10 @@ cookiesCreate () = Cookies (Client.createCookieJar [])
 |_| |_| |_|   |_| |_|
 -}
 
-newtype Request = Request { req :: Client.Request }
+data Request = Request {
+    req :: Client.Request
+  , req_jar :: Client.CookieJar
+  }
 
 requestCreateGet :: (MonadClient m s) => URL -> Cookies -> m (Either Error Request)
 requestCreateGet URL{..} Cookies{..} = do
@@ -173,10 +176,13 @@ requestCreateGet URL{..} Cookies{..} = do
     Right r -> do
       now <- liftIO getCurrentTime
       (r',_) <- pure $ Client.insertCookiesIntoRequest r jar now
-      return $ Right $ Request r'{
-          Client.redirectCount = 0
-        , Client.checkStatus = \_ _ _ -> Nothing
-        }
+      return $ Right $ Request {
+          req = r'{
+              Client.redirectCount = 0
+            , Client.checkStatus = \_ _ _ -> Nothing
+            },
+          req_jar = jar
+      }
 
 requestCreatePost :: (MonadClient m s) => FilledForm -> Cookies -> m (Either Error Request)
 requestCreatePost (FilledForm tit Shpider.Form{..}) c = do
@@ -188,7 +194,7 @@ requestCreatePost (FilledForm tit Shpider.Form{..}) c = do
         Left err -> do
           return $ Left err
         Right Request{..} -> do
-          return $ Right $ Request $ Client.urlEncodedBody (map (BS.pack *** BS.pack) $ Map.toList inputs) req
+          return $ Right $ Request (Client.urlEncodedBody (map (BS.pack *** BS.pack) $ Map.toList inputs) req) req_jar
 
 data Response = Response {
     resp :: Client.Response (Pipes.Producer ByteString IO ())
@@ -224,8 +230,9 @@ responseOK :: Response -> Bool
 responseOK r = c == 200 where
   c = responseCode r
 
-requestExecute :: (MonadClient m s) => Request -> Cookies -> m (Response, Cookies)
-requestExecute Request{..} Cookies{..} = do
+requestExecute :: (MonadClient m s) => Request -> m (Response, Cookies)
+requestExecute Request{..} = do
+  jar <- pure req_jar
   ClientState{..} <- toClientState <$> get
   clk <- liftIO $ do
     clk <- Clock.getTime Clock.Realtime
