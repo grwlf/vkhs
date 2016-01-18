@@ -12,19 +12,23 @@ import Data.Time
 import Data.Either
 import Control.Applicative
 import Control.Monad
-import Control.Monad.State (MonadState, execState, evalStateT, StateT(..), get)
+import Control.Monad.State (MonadState, execState, evalStateT, StateT(..), get, modify)
 import Control.Monad.Cont
 import Control.Monad.Reader
 
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 
+import System.IO
+
 import Web.VKHS.Error
 import Web.VKHS.Types
-import Web.VKHS.Login as Login
 import Web.VKHS.Client as Client
 import Web.VKHS.Monad
-import Web.VKHS.API
+import Web.VKHS.Login (MonadLogin, LoginState(..), ToLoginState(..), printForm, login)
+import qualified Web.VKHS.Login as Login
+import Web.VKHS.API (MonadAPI, APIState(..), ToAPIState(..), api)
+import qualified Web.VKHS.API as API
 
 import Debug.Trace
 
@@ -33,6 +37,7 @@ import Debug.Trace
 data State = State {
     cs :: ClientState
   , ls :: LoginState
+  , as :: APIState
   , go :: GenericOptions
   }
 
@@ -42,13 +47,16 @@ instance ToLoginState State where
 instance ToClientState State where
   toClientState = cs
   modifyClientState f = \s -> s { cs = f (cs s) }
+instance API.ToAPIState State where
+  toAPIState = as
+  modifyAPIState f = \s -> s { as = f (as s) }
 instance ToGenericOptions State where
   toGenericOptions = go
 
 initialState :: LoginOptions -> IO State
 initialState lo =
   let go = l_generic lo in
-  State <$> Client.defaultState go <*> pure (Login.defaultState lo) <*> pure go
+  State <$> Client.defaultState go <*> pure (Login.defaultState lo) <*> pure API.defaultState <*> pure go
 
 newtype VK r a = VK { unVK :: Guts VK (StateT State IO) r a }
   deriving(MonadIO, Functor, Applicative, Monad, MonadState State, MonadReader (r -> VK r r) , MonadCont)
@@ -56,6 +64,7 @@ newtype VK r a = VK { unVK :: Guts VK (StateT State IO) r a }
 instance MonadClient (VK r) State
 instance MonadVK (VK r) r
 instance MonadLogin (VK r) r State
+instance API.MonadAPI (VK r) r State
 
 type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
 
@@ -88,4 +97,23 @@ defaultSuperviser = go where
         return Nothing
 
 runLogin lo = initialState lo >>= evalStateT (defaultSuperviser (login >>= return . Fine))
+
+
+runAPI APIOptions{..} = do
+  s <- initialState a_login_options
+  flip evalStateT s $ do
+    case (null a_access_token) of
+      True -> do
+        at <- defaultSuperviser (login >>= return . Fine)
+        case at of
+          Just (AccessToken{..}) -> do
+            modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
+            call_api
+          Nothing -> do
+            return Nothing
+      False -> do
+        call_api
+  where
+    call_api = defaultSuperviser ((api a_method (Client.splitFragments "," "=" a_args)) >>= return . Fine)
+
 

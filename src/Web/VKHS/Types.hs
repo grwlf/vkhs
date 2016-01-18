@@ -127,12 +127,12 @@ data LoginOptions = LoginOptions {
   -- ^ Empty string means no value is given
   } deriving(Show)
 
-data CallOptions = CallOptions {
-    c_login_options :: LoginOptions
-  , c_accessToken :: String
-  , c_parse :: Bool
-  , c_method :: String
-  , c_args :: String
+data APIOptions = APIOptions {
+    a_login_options :: LoginOptions
+  , a_access_token :: String
+  , a_parse :: Bool
+  , a_method :: String
+  , a_args :: String
   } deriving(Show)
 
 data MusicOptions = MusicOptions {

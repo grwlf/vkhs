@@ -34,8 +34,12 @@ import Web.VKHS.Error
 import Debug.Trace
 
 data APIState = APIState {
-  api_access_token :: String
+    api_access_token :: String
   } deriving (Show)
+
+defaultState = APIState {
+    api_access_token = []
+  }
 
 class ToGenericOptions s => ToAPIState s where
   toAPIState :: s -> APIState
@@ -79,10 +83,13 @@ api mname margs = do
           (URL_Protocol protocol)
           (URL_Host o_api_host)
           (Just (URL_Port (show o_port)))
-          (URL_Path ("/" ++ mname))
+          (URL_Path ("/method/" ++ mname))
           (buildQuery (("access_token", api_access_token):margs)))
 
+  liftIO $ putStrLn $ "> " ++ (show url)
+
   req <- ensure $ requestCreateGet url (cookiesCreate ())
+
   (res, jar') <- requestExecute req
   liftIO $ putStrLn $ responseBody res
   return ()

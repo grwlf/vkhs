@@ -123,23 +123,24 @@ urlCreate :: URL_Protocol -> URL_Host -> Maybe URL_Port -> URL_Path -> URL_Query
 urlCreate URL_Protocol{..} URL_Host{..} port  URL_Path{..} URL_Query{..} =
   pure $ URL $ Client.URI (urlproto ++ ":") (Just (Client.URIAuth "" urlh (maybe "" ((":"++).urlp) port))) urlpath urlq []
 
+splitFragments :: String -> String -> String -> [(String,String)]
+splitFragments sep eqs =
+    filter (\(a, b) -> not (null a))
+  . map (f . splitOn eqs)
+  . concat
+  . map (splitOn sep)
+  . lines
+  where f []     = ("", "")
+        f [x]    = (trim x, "")
+        f (x:xs) = (trim x, trim $ intercalate eqs xs)
+
+        trim = rev (dropWhile (`elem` (" \t\n\r" :: String)))
+          where rev f = reverse . f . reverse . f
+
 urlFragments :: URL -> [(String,String)]
-urlFragments URL{..} = parser $  unsharp $ Client.uriFragment uri where
+urlFragments URL{..} = splitFragments "&" "=" $  unsharp $ Client.uriFragment uri where
   unsharp ('#':x) = x
   unsharp y = y
-  trim = rev (dropWhile (`elem` (" \t\n\r" :: String)))
-    where rev f = reverse . f . reverse . f
-  sep = "&"
-  eqs = "="
-  parser =
-      filter (\(a, b) -> not (null a))
-    . map (f . splitOn eqs)
-    . concat
-    . map (splitOn sep)
-    . lines
-    where f []     = ("", "")
-          f [x]    = (trim x, "")
-          f (x:xs) = (trim x, trim $ intercalate eqs xs)
 
 {-
   ____            _    _

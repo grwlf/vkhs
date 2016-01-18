@@ -13,7 +13,7 @@ import Web.VKHS.Types
 
 data Options
   = Login LoginOptions
-  | Call CallOptions
+  | API APIOptions
   | Music MusicOptions
   | UserQ UserOptions
   | WallQ WallOptions
@@ -46,16 +46,18 @@ loginOptions' = LoginOptions
 opts m =
   let access_token_flag = strOption (short 'a' <> m <> metavar "ACCESS_TOKEN" <>
         help "Access token. Honores VKQ_ACCESS_TOKEN environment variable")
+      api_cmd = (info (API <$> (APIOptions
+        <$> loginOptions'
+        <*> access_token_flag
+        <*> switch (long "preparse" <> short 'p' <> help "Preparse into Aeson format")
+        <*> argument str (metavar "METHOD" <> help "Method name")
+        <*> argument str (metavar "PARAMS" <> help "Method arguments, KEY=VALUE[,KEY2=VALUE2[,,,]]")))
+        ( progDesc "Call VK API method" ))
   in subparser (
     command "login" (info (Login <$> loginOptions)
       ( progDesc "Login and print access token (also prints user_id and expiration time)" ))
-    <> command "call" (info (Call <$> (CallOptions
-      <$> loginOptions'
-      <*> access_token_flag
-      <*> switch (long "preparse" <> short 'p' <> help "Preparse into Aeson format")
-      <*> argument str (metavar "METHOD" <> help "Method name")
-      <*> argument str (metavar "PARAMS" <> help "Method arguments, KEY=VALUE[,KEY2=VALUE2[,,,]]")))
-      ( progDesc "Call VK API method" ))
+    <> command "call" api_cmd
+    <> command "api" api_cmd
     <> command "music" (info ( Music <$> (MusicOptions
       <$> loginOptions'
       <*> access_token_flag
@@ -96,7 +98,7 @@ opts m =
 
 main :: IO ()
 main = do
-  m <- maybe (idm) (value) <$> lookupEnv "VKQ_ACCESS_TOKEN"
+  m <- maybe (value "") (value) <$> lookupEnv "VKQ_ACCESS_TOKEN"
   execParser (info (helper <*> opts m) (fullDesc <> header "VKontakte social network tool")) >>= cmd
   `catch` (\(e::SomeException) -> do
     putStrLn $ (show e))
@@ -114,4 +116,8 @@ cmd (Login lo) = do
     Nothing -> do
       exitFailure
 
+-- API
+cmd (API ao) = do
+  runAPI ao
+  return ()
 
