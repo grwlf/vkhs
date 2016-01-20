@@ -4,9 +4,12 @@
 module Main where
 
 import Control.Exception (SomeException(..),catch,bracket)
+import Control.Monad.Trans
+import Control.Monad.Trans.Either
 import Options.Applicative
 import System.Environment
 import System.Exit
+import System.IO
 
 import Web.VKHS
 import Web.VKHS.Types
@@ -97,27 +100,38 @@ opts m =
     )
 
 main :: IO ()
-main = do
+main = ( do
   m <- maybe (value "") (value) <$> lookupEnv "VKQ_ACCESS_TOKEN"
-  execParser (info (helper <*> opts m) (fullDesc <> header "VKontakte social network tool")) >>= cmd
-  `catch` (\(e::SomeException) -> do
-    putStrLn $ (show e))
+  o <- execParser (info (helper <*> opts m) (fullDesc <> header "VKontakte social network tool"))
+  r <- runEitherT (cmd o)
+  case r of
+    Left err -> do
+      hPutStrLn stderr err
+      exitFailure
+    Right _ -> do
+      exitSuccess
+  )`catch` (\(e::SomeException) -> do
+    putStrLn $ (show e)
+    exitFailure
+  )
 
-
-cmd :: Options -> IO ()
+cmd :: Options -> EitherT String IO ()
 
 -- Login
 cmd (Login lo) = do
-  acc <- runLogin lo
-  case acc of
-    Right (AccessToken{..}) -> do
-      putStrLn at_access_token
-      exitSuccess
-    Left err -> do
-      exitFailure
+  AccessToken{..} <- runLogin lo
+  liftIO $ putStrLn at_access_token
 
 -- API
 cmd (API ao) = do
   runAPI ao
   return ()
+
+-- Query audio files
+-- cmd (Music (MusicOptions act _ q@(_:_) fmt _ _ _ _)) = do
+--   let e = (envcall act) { verbose = v }
+--   Response (SL len ms) <- api_ e "audio.search" [("q",q)]
+--   forM_ ms $ \m -> do
+--     printf "%s\n" (mr_format fmt m)
+--   printf "total %d\n" len
 

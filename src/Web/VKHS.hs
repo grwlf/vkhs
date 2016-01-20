@@ -15,6 +15,7 @@ import Control.Monad
 import Control.Monad.State (MonadState, execState, evalStateT, StateT(..), get, modify)
 import Control.Monad.Cont
 import Control.Monad.Reader
+import Control.Monad.Trans.Either
 
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -53,12 +54,12 @@ instance API.ToAPIState State where
 instance ToGenericOptions State where
   toGenericOptions = go
 
-initialState :: LoginOptions -> IO State
+initialState :: LoginOptions -> EitherT String IO State
 initialState lo =
   let go = l_generic lo in
-  State <$> Client.defaultState go <*> pure (Login.defaultState lo) <*> pure API.defaultState <*> pure go
+  State <$> lift (Client.defaultState go) <*> pure (Login.defaultState lo) <*> pure API.defaultState <*> pure go
 
-newtype VK r a = VK { unVK :: Guts VK (StateT State IO) r a }
+newtype VK r a = VK { unVK :: Guts VK (StateT State (EitherT String IO)) r a }
   deriving(MonadIO, Functor, Applicative, Monad, MonadState State, MonadReader (r -> VK r r) , MonadCont)
 
 instance MonadClient (VK r) State
@@ -68,17 +69,17 @@ instance API.MonadAPI (VK r) r State
 
 type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
 
-runVK :: VK r r -> StateT State IO r
+runVK :: VK r r -> StateT State (EitherT String IO) r
 runVK m = runContT (runReaderT (unVK (catch m)) undefined) return
 
-defaultSuperviser :: (Show a) => VK (R VK a) (R VK a) -> StateT State IO (Either String a)
+defaultSuperviser :: (Show a) => VK (R VK a) (R VK a) -> StateT State (EitherT String IO) a
 defaultSuperviser = go where
   go m = do
     GenericOptions{..} <- toGenericOptions <$> get
     res <- runVK m
     res_desc <- pure (describeResult res)
     case res of
-      Fine a -> return (Right a)
+      Fine a -> return a
       UnexpectedInt e k -> do
         liftIO (putStrLn "Int!")
         go (k 0)
@@ -92,29 +93,22 @@ defaultSuperviser = go where
             go (k v)
           False -> do
             liftIO $ putStrLn $ "Unable to query value for " ++ i ++ " since interactive mode is disabled"
-            return (Left res_desc)
+            lift $ left res_desc
       _ -> do
         liftIO $ putStrLn $ "Unsupervised error: " ++ res_desc
-        return (Left res_desc)
+        lift $ left res_desc
 
-runLogin lo = initialState lo >>= evalStateT (defaultSuperviser (login >>= return . Fine))
+runLogin lo = do
+  s <- initialState lo
+  evalStateT (defaultSuperviser (login >>= return . Fine)) s
 
 
 runAPI APIOptions{..} = do
   s <- initialState a_login_options
   flip evalStateT s $ do
-    case (null a_access_token) of
-      True -> do
-        at <- defaultSuperviser (login >>= return . Fine)
-        case at of
-          Right (AccessToken{..}) -> do
-            modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
-            call_api
-          Left err ->
-            return (Left err)
-      False -> do
-        call_api
-  where
-    call_api = defaultSuperviser ((api a_method (Client.splitFragments "," "=" a_args)) >>= return . Fine)
+  when (null a_access_token) $do
+    AccessToken{..} <- defaultSuperviser (login >>= return . Fine)
+    modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
+  defaultSuperviser ((api a_method (Client.splitFragments "," "=" a_args)) >>= return . Fine)
 
 

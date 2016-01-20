@@ -47,7 +47,8 @@ library
                      utf8-string,
                      clock,
                      optparse-applicative,
-                     aeson
+                     aeson,
+                     EitherT
 
 
 executable vkq
