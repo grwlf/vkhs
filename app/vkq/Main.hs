@@ -86,7 +86,7 @@ opts m =
       <*> strOption
         ( metavar "FORMAT"
         <> short 'F'
-        <> value "%a - %t"
+        <> value "%o_%i %u\t%t"
         <> help "FileName format, supported tags: %i %o %a %t %d %u"
         )
       <*> strOption (metavar "DIR" <> short 'o' <> help "Output directory" <> value "")
@@ -146,12 +146,20 @@ cmd (API (APIOptions{..})) = do
   return ()
 
 -- Query audio files
-cmd (Music (MusicOptions{..})) = do
-  runAPI m_login_options m_access_token $ do
-    API.Response (SizedList len ms) <- apiG "audio.search" [("q",m_search_string)]
-    forM_ ms $ \m -> do
-      liftIO $ printf "%s\n" (mr_format m_output_format m)
-    liftIO $ printf "total %d\n" len
+cmd (Music (MusicOptions{..}))
+
+  |not (null m_search_string) = do
+    runAPI m_login_options m_access_token $ do
+      API.Response (SizedList len ms) <- apiG "audio.search" [("q",m_search_string)]
+      forM_ ms $ \m -> do
+        liftIO $ printf "%s\n" (mr_format m_output_format m)
+      liftIO $ printf "total %d\n" len
+
+  |m_list_music = do
+    runAPI m_login_options m_access_token $ do
+      (API.Response (ms :: [MusicRecord])) <- apiG "audio.get" [("q",m_search_string)]
+      forM_ ms $ \m -> do
+        liftIO $ printf "%s\n" (mr_format m_output_format m)
 
 {-
  _   _ _   _ _
