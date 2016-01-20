@@ -4,15 +4,24 @@
 module Main where
 
 import Control.Exception (SomeException(..),catch,bracket)
+import Control.Monad
 import Control.Monad.Trans
 import Control.Monad.Trans.Either
+import Data.Maybe
+import Data.List
+import Data.Char
 import Options.Applicative
 import System.Environment
 import System.Exit
 import System.IO
+import Text.RegexPR
+import Text.Printf
 
 import Web.VKHS
 import Web.VKHS.Types
+import Web.VKHS.Client
+import Web.VKHS.API as API
+import Web.VKHS.API.Types as API
 
 data Options
   = Login LoginOptions
@@ -109,11 +118,20 @@ main = ( do
       hPutStrLn stderr err
       exitFailure
     Right _ -> do
-      exitSuccess
+      return ()
   )`catch` (\(e::SomeException) -> do
     putStrLn $ (show e)
     exitFailure
   )
+
+{-
+  ____ _     ___
+ / ___| |   |_ _|
+| |   | |    | |
+| |___| |___ | |
+ \____|_____|___|
+
+ -}
 
 cmd :: Options -> EitherT String IO ()
 
@@ -123,15 +141,53 @@ cmd (Login lo) = do
   liftIO $ putStrLn at_access_token
 
 -- API
-cmd (API ao) = do
-  runAPI ao
+cmd (API (APIOptions{..})) = do
+  runAPI a_login_options a_access_token (api a_method (splitFragments "," "=" a_args))
   return ()
 
 -- Query audio files
--- cmd (Music (MusicOptions act _ q@(_:_) fmt _ _ _ _)) = do
---   let e = (envcall act) { verbose = v }
---   Response (SL len ms) <- api_ e "audio.search" [("q",q)]
---   forM_ ms $ \m -> do
---     printf "%s\n" (mr_format fmt m)
---   printf "total %d\n" len
+cmd (Music (MusicOptions{..})) = do
+  runAPI m_login_options m_access_token $ do
+    API.Response (SizedList len ms) <- apiG "audio.search" [("q",m_search_string)]
+    forM_ ms $ \m -> do
+      liftIO $ printf "%s\n" (mr_format m_output_format m)
+    liftIO $ printf "total %d\n" len
+
+{-
+ _   _ _   _ _
+| | | | |_(_) |___
+| | | | __| | / __|
+| |_| | |_| | \__ \
+ \___/ \__|_|_|___/
+
+ -}
+
+mr_format :: String -> MusicRecord -> String
+mr_format s mr = pformat '%'
+  [ ('i', show . mr_id)
+  , ('o', show . mr_owner_id)
+  , ('a', namefilter . mr_artist)
+  , ('t', namefilter . mr_title)
+  , ('d', show . mr_duration)
+  , ('u', mr_url)
+  ] s mr
+
+pformat :: Char -> [(Char, a->String)] -> String -> a -> String
+pformat x d s a = reverse $ scan [] s where
+  scan h (c:m:cs)
+    | c == x = scan ((reverse $ fromMaybe (const $ c:m:[]) (lookup m d) $ a)++h) cs
+    | otherwise = scan (c:h) (m:cs)
+  scan h (c:[]) = c:h
+  scan h [] = h
+
+
+trim_space = gsubRegexPR "^ +| +$" ""
+one_space = gsubRegexPR " +" " "
+normal_letters = filter (\c -> or [ isAlphaNum c , c=='-', c=='_', c==' ', c=='&'])
+html_amp = gsubRegexPR "&amp;" "&"
+no_html = gsubRegexPR re "" where
+  re = concat $ intersperse "|" [ "&[a-z]+;" , "&#[0-9]+;" ]
+
+namefilter :: String -> String
+namefilter = trim_space . one_space . normal_letters . no_html . html_amp
 

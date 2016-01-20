@@ -21,6 +21,7 @@ data Result t a =
   | LoginActionsExhausted
   | RepeatedForm Form (() -> t (R t a) (R t a))
   | JSONParseFailure ByteString (JSON -> t (R t a) (R t a))
+  | JSONParseFailure' String
 
 data ResultDescription a =
     DescFine a
@@ -36,4 +37,5 @@ describeResult (UnexpectedRequest e k) = "UnexpectedRequest " ++ (show e)
 describeResult LoginActionsExhausted = "LoginActionsExhausted"
 describeResult (RepeatedForm f k) = "RepeatedForm"
 describeResult (JSONParseFailure bs _) = "JSONParseFailure " ++ (show bs)
+describeResult (JSONParseFailure' s) = "JSONParseFailure' " ++ (show s)
 

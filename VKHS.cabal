@@ -48,11 +48,13 @@ library
                      clock,
                      optparse-applicative,
                      aeson,
-                     EitherT
+                     EitherT,
+                     vector
 
 
 executable vkq
   hs-source-dirs:    app/vkq, src
   main-is:           Main.hs
+  build-depends:     regexpr
 
 

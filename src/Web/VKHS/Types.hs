@@ -141,7 +141,7 @@ data APIOptions = APIOptions {
 
 data MusicOptions = MusicOptions {
     m_login_options :: LoginOptions
-  , m_accessToken :: String
+  , m_access_token :: String
   , m_list_music :: Bool
   , m_search_string :: String
   , m_name_format :: String
@@ -153,13 +153,13 @@ data MusicOptions = MusicOptions {
 
 data UserOptions = UserOptions {
     u_login_options :: LoginOptions
-  , u_accessToken :: String
+  , u_access_token :: String
   , u_queryString :: String
   } deriving(Show)
 
 data WallOptions = WallOptions {
     w_login_options :: LoginOptions
-  , w_accessToken :: String
+  , w_access_token :: String
   , w_woid :: String
   } deriving(Show)
 

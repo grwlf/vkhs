@@ -103,12 +103,12 @@ runLogin lo = do
   evalStateT (defaultSuperviser (login >>= return . Fine)) s
 
 
-runAPI APIOptions{..} = do
-  s <- initialState a_login_options
+runAPI login_options access_token m = do
+  s <- initialState login_options
   flip evalStateT s $ do
-  when (null a_access_token) $do
+  when (null access_token) $do
     AccessToken{..} <- defaultSuperviser (login >>= return . Fine)
     modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
-  defaultSuperviser ((api a_method (Client.splitFragments "," "=" a_args)) >>= return . Fine)
+  defaultSuperviser (m >>= return . Fine)
 
 

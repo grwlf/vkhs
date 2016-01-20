@@ -68,7 +68,6 @@ class (MonadIO m, MonadClient m s, ToAPIState s, MonadVK m r) => MonadAPI m r s 
 
 type API m x a = m (R m x) a
 
-
 parseJSON :: (MonadAPI (m (R m x)) (R m x) s)
     => ByteString
     -> API m x JSON
@@ -76,7 +75,6 @@ parseJSON bs = do
   case Aeson.decode (fromStrict bs) of
     Just js -> return (JSON js)
     Nothing -> raise (JSONParseFailure bs)
-
 
 api :: (MonadAPI (m (R m x)) (R m x) s)
     => String
@@ -104,4 +102,16 @@ api mname margs = do
   (res, jar') <- requestExecute req
   parseJSON (responseBody res)
 
+
+apiG :: (Aeson.FromJSON a, MonadAPI (m (R m x)) (R m x) s)
+    => String
+    -- ^ API method name
+    -> [(String, String)]
+    -- ^ API method arguments
+    -> API m x a
+apiG m args = do
+  JSON{..} <- api m args
+  case Aeson.parseEither Aeson.parseJSON js_aeson of
+    Right a -> return a
+    Left e -> terminate (JSONParseFailure' e)
 
