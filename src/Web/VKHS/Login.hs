@@ -147,7 +147,7 @@ actionRequest a@(DoPOST form jar) = do
 analyzeResponse :: (MonadLogin (m (R m x)) (R m x) s) => (Response, Cookies) -> Login m x (Either RobotAction AccessToken)
 analyzeResponse (res, jar) = do
   LoginState{..} <- toLoginState <$> get
-  let tags = Tagsoup.parseTags (responseBody res)
+  let tags = Tagsoup.parseTags (responseBodyS res)
       title = Shpider.gatherTitle tags
       forms = map (Form title) (Shpider.gatherForms tags)
   dumpResponseBody "latest.html" res

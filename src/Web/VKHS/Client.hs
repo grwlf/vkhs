@@ -202,8 +202,11 @@ data Response = Response {
   , resp_body :: ByteString
   }
 
-responseBody :: Response -> String
-responseBody Response{..} = BS.unpack $ resp_body
+responseBodyS :: Response -> String
+responseBodyS Response{..} = BS.unpack $ resp_body
+
+responseBody :: Response -> ByteString
+responseBody Response{..} = resp_body
 
 dumpResponseBody :: (MonadClient m s) => FilePath -> Response -> m ()
 dumpResponseBody f Response{..} = liftIO $ BS.writeFile f resp_body

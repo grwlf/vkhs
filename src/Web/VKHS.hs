@@ -71,13 +71,14 @@ type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
 runVK :: VK r r -> StateT State IO r
 runVK m = runContT (runReaderT (unVK (catch m)) undefined) return
 
-defaultSuperviser :: (Show a) => VK (R VK a) (R VK a) -> StateT State IO (Maybe a)
+defaultSuperviser :: (Show a) => VK (R VK a) (R VK a) -> StateT State IO (Either String a)
 defaultSuperviser = go where
   go m = do
     GenericOptions{..} <- toGenericOptions <$> get
     res <- runVK m
+    res_desc <- pure (describeResult res)
     case res of
-      Fine a -> return (Just a)
+      Fine a -> return (Right a)
       UnexpectedInt e k -> do
         liftIO (putStrLn "Int!")
         go (k 0)
@@ -91,10 +92,10 @@ defaultSuperviser = go where
             go (k v)
           False -> do
             liftIO $ putStrLn $ "Unable to query value for " ++ i ++ " since interactive mode is disabled"
-            return Nothing
+            return (Left res_desc)
       _ -> do
-        liftIO $ putStrLn $ "Unsupervised error: " ++ (describeResult res)
-        return Nothing
+        liftIO $ putStrLn $ "Unsupervised error: " ++ res_desc
+        return (Left res_desc)
 
 runLogin lo = initialState lo >>= evalStateT (defaultSuperviser (login >>= return . Fine))
 
@@ -106,11 +107,11 @@ runAPI APIOptions{..} = do
       True -> do
         at <- defaultSuperviser (login >>= return . Fine)
         case at of
-          Just (AccessToken{..}) -> do
+          Right (AccessToken{..}) -> do
             modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
             call_api
-          Nothing -> do
-            return Nothing
+          Left err ->
+            return (Left err)
       False -> do
         call_api
   where

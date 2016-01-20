@@ -46,7 +46,8 @@ library
                      split,
                      utf8-string,
                      clock,
-                     optparse-applicative
+                     optparse-applicative,
+                     aeson
 
 
 executable vkq

@@ -19,10 +19,12 @@ import Control.Monad.Writer
 import Control.Monad.Cont
 
 import Data.ByteString.Char8 (ByteString)
+import Data.ByteString.Lazy (fromStrict)
 import qualified Data.ByteString.Char8 as BS
 
--- import qualified Data.ByteString.UTF8 as U
--- import qualified Data.ByteString as BS
+import Data.Aeson ((.=), (.:))
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Types as Aeson
 
 import Text.Printf
 
@@ -66,12 +68,22 @@ class (MonadIO m, MonadClient m s, ToAPIState s, MonadVK m r) => MonadAPI m r s 
 
 type API m x a = m (R m x) a
 
+
+parseJSON :: (MonadAPI (m (R m x)) (R m x) s)
+    => ByteString
+    -> API m x JSON
+parseJSON bs = do
+  case Aeson.decode (fromStrict bs) of
+    Just js -> return (JSON js)
+    Nothing -> raise (JSONParseFailure bs)
+
+
 api :: (MonadAPI (m (R m x)) (R m x) s)
     => String
     -- ^ API method name
     -> [(String, String)]
     -- ^ API method arguments
-    -> API m x ()
+    -> API m x JSON
 api mname margs = do
   APIState{..} <- toAPIState <$> get
   GenericOptions{..} <- toGenericOptions <$> get
@@ -88,10 +100,8 @@ api mname margs = do
 
   liftIO $ putStrLn $ "> " ++ (show url)
 
-  req <- ensure $ requestCreateGet url (cookiesCreate ())
-
+  req <- ensure (requestCreateGet url (cookiesCreate ()))
   (res, jar') <- requestExecute req
-  liftIO $ putStrLn $ responseBody res
-  return ()
+  parseJSON (responseBody res)
 
 

@@ -110,10 +110,10 @@ cmd :: Options -> IO ()
 cmd (Login lo) = do
   acc <- runLogin lo
   case acc of
-    Just (AccessToken{..}) -> do
+    Right (AccessToken{..}) -> do
       putStrLn at_access_token
       exitSuccess
-    Nothing -> do
+    Left err -> do
       exitFailure
 
 -- API

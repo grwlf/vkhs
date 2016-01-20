@@ -3,6 +3,7 @@ module Web.VKHS.Error where
 import Web.VKHS.Types
 import Web.VKHS.Client (Response, Request, URL)
 import qualified Web.VKHS.Client as Client
+import Data.ByteString.Char8 (ByteString)
 
 data Error = ETimeout | EClient Client.Error
   deriving(Show, Eq)
@@ -19,6 +20,7 @@ data Result t a =
   | UnexpectedFormField Form String (String -> t (R t a) (R t a))
   | LoginActionsExhausted
   | RepeatedForm Form (() -> t (R t a) (R t a))
+  | JSONParseFailure ByteString (JSON -> t (R t a) (R t a))
 
 data ResultDescription a =
     DescFine a
@@ -33,4 +35,5 @@ describeResult (UnexpectedURL e k) = "UnexpectedURL " ++ (show e)
 describeResult (UnexpectedRequest e k) = "UnexpectedRequest " ++ (show e)
 describeResult LoginActionsExhausted = "LoginActionsExhausted"
 describeResult (RepeatedForm f k) = "RepeatedForm"
+describeResult (JSONParseFailure bs _) = "JSONParseFailure " ++ (show bs)
 

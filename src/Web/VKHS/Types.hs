@@ -3,6 +3,10 @@ module Web.VKHS.Types where
 import Data.List
 import Data.Char
 
+import Data.Aeson (FromJSON(..), ToJSON(..), (.=), (.:))
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Types as Aeson
+
 import qualified Network.Shpider.Forms as Shpider
 
 -- | AccessToken is a authentication data, required by all VK API
@@ -158,4 +162,7 @@ data WallOptions = WallOptions {
   , w_accessToken :: String
   , w_woid :: String
   } deriving(Show)
+
+data JSON = JSON { js_aeson :: Aeson.Value }
+  deriving(Show)
 
