@@ -80,13 +80,13 @@ opts m =
       <*> strOption
         ( metavar "FORMAT"
         <> short 'f'
-        <> value "%o_%i %u\t%t"
+        <> value "%o_%i %U\t%t"
         <> help "Listing format, supported tags: %i %o %a %t %d %u"
         )
       <*> strOption
         ( metavar "FORMAT"
         <> short 'F'
-        <> value "%o_%i %u\t%t"
+        <> value "%o_%i %U\t%t"
         <> help "FileName format, supported tags: %i %o %a %t %d %u"
         )
       <*> strOption (metavar "DIR" <> short 'o' <> help "Output directory" <> value "")
@@ -178,6 +178,7 @@ mr_format s mr = pformat '%'
   , ('t', namefilter . mr_title)
   , ('d', show . mr_duration)
   , ('u', mr_url)
+  , ('U', cutextra . mr_url)
   ] s mr
 
 pformat :: Char -> [(Char, a->String)] -> String -> a -> String
@@ -195,6 +196,8 @@ normal_letters = filter (\c -> or [ isAlphaNum c , c=='-', c=='_', c==' ', c=='&
 html_amp = gsubRegexPR "&amp;" "&"
 no_html = gsubRegexPR re "" where
   re = concat $ intersperse "|" [ "&[a-z]+;" , "&#[0-9]+;" ]
+
+cutextra = gsubRegexPR "\\?extra=.*" ""
 
 namefilter :: String -> String
 namefilter = trim_space . one_space . normal_letters . no_html . html_amp
