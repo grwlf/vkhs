@@ -70,9 +70,11 @@ data ClientState = ClientState {
 
 defaultState :: GenericOptions -> IO ClientState
 defaultState GenericOptions{..} = do
-  cl_man <- (case o_use_https of
-              True -> Client.newManager tlsManagerSettings
-              False -> Client.newManager Client.defaultManagerSettings)
+  cl_man <- Client.newManager
+              (Client.managerSetProxy (Client.proxyEnvironment Nothing)
+                (case o_use_https of
+                  True -> tlsManagerSettings
+                  False -> Client.defaultManagerSettings))
   cl_last_execute <- pure (TimeSpec 0 0)
   cl_minimum_interval_ns <- pure (round (10^9  / o_max_request_rate_per_sec))
   return ClientState{..}
