@@ -1,9 +1,11 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module Web.VKHS.Error where
 
 import Web.VKHS.Types
 import Web.VKHS.Client (Response, Request, URL)
 import qualified Web.VKHS.Client as Client
-import Data.ByteString.Char8 (ByteString)
+import Data.ByteString.Char8 (ByteString, unpack)
 
 data Error = ETimeout | EClient Client.Error
   deriving(Show, Eq)
@@ -21,7 +23,7 @@ data Result t a =
   | LoginActionsExhausted
   | RepeatedForm Form (() -> t (R t a) (R t a))
   | JSONParseFailure ByteString (JSON -> t (R t a) (R t a))
-  | JSONParseFailure' String
+  | JSONParseFailure' JSON String
 
 data ResultDescription a =
     DescFine a
@@ -37,5 +39,5 @@ describeResult (UnexpectedRequest e k) = "UnexpectedRequest " ++ (show e)
 describeResult LoginActionsExhausted = "LoginActionsExhausted"
 describeResult (RepeatedForm f k) = "RepeatedForm"
 describeResult (JSONParseFailure bs _) = "JSONParseFailure " ++ (show bs)
-describeResult (JSONParseFailure' s) = "JSONParseFailure' " ++ (show s)
+describeResult (JSONParseFailure' JSON{..} s) = "JSONParseFailure' " ++ (show s) ++ " JSON: " ++ (show js_aeson)
 

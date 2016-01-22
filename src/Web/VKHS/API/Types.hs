@@ -9,13 +9,18 @@ import Data.Data
 import Data.Time.Clock
 import Data.Time.Clock.POSIX
 
-import Data.Aeson ((.=), (.:), FromJSON(..))
+import Data.Aeson ((.=), (.:), (.:?), (.!=), FromJSON(..))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 
 import Data.Vector as Vector (head, tail)
+import Data.Text
 
 import Text.Printf
+
+-- See http://vk.com/developers.php?oid=-1&p=Авторизация_клиентских_приложений
+-- (in Russian) for more details
+
 
 newtype Response a = Response a
   deriving (Show, Data, Typeable)
@@ -65,6 +70,7 @@ instance FromJSON MusicRecord where
       <*> (o .: "url")
   parseJSON o = parseJSON_obj_error "MusicRecord" o
 
+
 data UserRecord = UserRecord
   { ur_id :: Int
   , ur_first_name :: String
@@ -76,6 +82,7 @@ data UserRecord = UserRecord
   , ur_faculty_name :: Maybe String
   , ur_graduation :: Maybe Int
   } deriving (Show, Data, Typeable)
+
 
 data WallRecord = WallRecord
   { wr_id :: Int
@@ -92,4 +99,73 @@ data RespError = RespError
   { error_code :: Int
   , error_msg :: String
   } deriving (Show)
+
+data Deact = Banned | Deleted | OtherDeact Text
+  deriving(Show,Eq,Ord)
+
+instance FromJSON Deact where
+  parseJSON = Aeson.withText "Deact" $ \x ->
+    return $ case x of
+              "deleted" -> Deleted
+              "banned" -> Banned
+              x -> OtherDeact x
+
+data GroupType = Group | Event | Public | OtherGroupType Text
+  deriving(Show,Eq,Ord)
+
+instance FromJSON GroupType where
+  parseJSON = Aeson.withText "GroupType" $ \x ->
+    return $ case x of
+              "group" -> Group
+              "page" -> Public
+              "event" -> Event
+              x -> OtherGroupType x
+
+
+data Result a = Result {
+    r_count :: Int
+  , r_items :: a
+  } deriving (Show)
+
+instance FromJSON a => FromJSON (Result a) where
+  parseJSON = Aeson.withObject "Result" $ \o ->
+    Result <$> o .: "count" <*> o .: "items"
+
+data GroupRecord = GroupRecord {
+    gr_id :: Int
+  , gr_name :: String
+  , gr_screen_name :: String
+  , gr_is_closed :: Int
+  , gr_deact :: Maybe Deact
+  , gr_is_admin :: Int
+  , gr_admin_level :: Maybe Int
+  , gr_is_member :: Int
+  , gr_member_status :: Maybe Int
+  , gr_invited_by :: Maybe Int
+  , gr_type :: GroupType
+  , gr_has_photo :: Bool
+  , gr_photo_50 :: String
+  , gr_photo_100 :: String
+  , gr_photo_200 :: String
+  } deriving (Show)
+
+instance FromJSON GroupRecord where
+  parseJSON (Aeson.Object o) =
+    GroupRecord
+      <$> (o .: "id")
+      <*> (o .: "name")
+      <*> (o .: "screen_name")
+      <*> (o .: "is_closed")
+      <*> (o .:? "deactivated")
+      <*> (o .: "is_admin")
+      <*> (o .:? "admin_level")
+      <*> (o .: "is_member")
+      <*> (o .:? "member_status")
+      <*> (o .:? "invited_by")
+      <*> (o .: "type")
+      <*> (o .:? "has_photo" .!= False)
+      <*> (o .: "photo_50")
+      <*> (o .: "photo_100")
+      <*> (o .: "photo_200")
+  parseJSON o = parseJSON_obj_error "GroupRecord" o
 

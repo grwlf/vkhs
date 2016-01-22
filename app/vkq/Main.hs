@@ -29,6 +29,7 @@ data Options
   | Music MusicOptions
   | UserQ UserOptions
   | WallQ WallOptions
+  | GroupQ GroupOptions
   deriving(Show)
 
 genericOptions :: Parser GenericOptions
@@ -106,6 +107,12 @@ opts m =
       <*> strOption (long "id" <> short 'i' <> help "Owner id")
       ))
       ( progDesc "Extract wall information"))
+    <> command "group" (info ( GroupQ <$> (GroupOptions
+      <$> loginOptions'
+      <*> access_token_flag
+      <*> strOption (long "query" <> short 'q' <> value [] <> help "Group search string")
+      ))
+      ( progDesc "Extract groups information"))
     )
 
 main :: IO ()
@@ -160,6 +167,17 @@ cmd (Music (MusicOptions{..}))
       (API.Response (ms :: [MusicRecord])) <- apiG "audio.get" [("q",m_search_string)]
       forM_ ms $ \m -> do
         liftIO $ printf "%s\n" (mr_format m_output_format m)
+
+-- Query groups files
+cmd (GroupQ (GroupOptions{..}))
+
+  |not (null g_search_string) = do
+    runAPI g_login_options g_access_token $ do
+      API.Response (Result cnt (ms :: [GroupRecord])) <- apiG "groups.search" [("q",g_search_string), ("v","5.44")]
+      liftIO $ printf "raw: %s\n" (show ms)
+      -- forM_ ms $ \m -> do
+      --   liftIO $ printf "%s\n" (mr_format g_output_format m)
+      -- liftIO $ printf "total %d\n" len
 
 {-
  _   _ _   _ _

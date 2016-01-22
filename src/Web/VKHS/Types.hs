@@ -163,6 +163,12 @@ data WallOptions = WallOptions {
   , w_woid :: String
   } deriving(Show)
 
+data GroupOptions = GroupOptions {
+    g_login_options :: LoginOptions
+  , g_access_token :: String
+  , g_search_string :: String
+  } deriving(Show)
+
 data JSON = JSON { js_aeson :: Aeson.Value }
   deriving(Show)
 
