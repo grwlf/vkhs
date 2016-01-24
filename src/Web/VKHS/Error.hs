@@ -39,5 +39,5 @@ describeResult (UnexpectedRequest e k) = "UnexpectedRequest " ++ (show e)
 describeResult LoginActionsExhausted = "LoginActionsExhausted"
 describeResult (RepeatedForm f k) = "RepeatedForm"
 describeResult (JSONParseFailure bs _) = "JSONParseFailure " ++ (show bs)
-describeResult (JSONParseFailure' JSON{..} s) = "JSONParseFailure' " ++ (show s) ++ " JSON: " ++ (show js_aeson)
+describeResult (JSONParseFailure' JSON{..} s) = "JSONParseFailure' " ++ (show s) ++ " JSON: " ++ (take 1000 $ show js_aeson)
 

@@ -106,9 +106,12 @@ runLogin lo = do
 runAPI login_options access_token m = do
   s <- initialState login_options
   flip evalStateT s $ do
-  when (null access_token) $do
-    AccessToken{..} <- defaultSuperviser (login >>= return . Fine)
-    modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
+  case (null access_token) of
+    True -> do
+      AccessToken{..} <- defaultSuperviser (login >>= return . Fine)
+      modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
+    False -> do
+      modify $ modifyAPIState (\as -> as{api_access_token = access_token})
   defaultSuperviser (m >>= return . Fine)
 
 

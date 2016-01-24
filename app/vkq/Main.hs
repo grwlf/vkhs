@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Main where
@@ -10,6 +11,9 @@ import Control.Monad.Trans.Either
 import Data.Maybe
 import Data.List
 import Data.Char
+import Data.Text(Text(..),pack)
+import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
 import Options.Applicative
 import System.Environment
 import System.Exit
@@ -45,14 +49,14 @@ genericOptions = GenericOptions
 loginOptions :: Parser LoginOptions
 loginOptions = LoginOptions
   <$> genericOptions
-  <*> (AppID <$> strOption (metavar "APPID" <> short 'a' <> value "3128877" <> help "Application ID, defaults to VKHS" ))
+  <*> (AppID <$> strOption (long "appid" <> metavar "APPID" <> value "3128877" <> help "Application ID, defaults to VKHS" ))
   <*> argument str (metavar "USER" <> help "User name or email")
   <*> argument str (metavar "PASS" <> help "User password")
 
 loginOptions' :: Parser LoginOptions
 loginOptions' = LoginOptions
   <$> genericOptions
-  <*> (AppID <$> strOption (metavar "APPID" <> short 'a' <> value "3128877" <> help "Application ID, defaults to VKHS" ))
+  <*> (AppID <$> strOption (long "appid" <> metavar "APPID" <> value "3128877" <> help "Application ID, defaults to VKHS" ))
   <*> strOption (long "user" <> value "" <> metavar "STR" <> help "User name or email")
   <*> strOption (long "pass" <> value "" <> metavar "STR" <> help "Password")
 
@@ -173,8 +177,30 @@ cmd (GroupQ (GroupOptions{..}))
 
   |not (null g_search_string) = do
     runAPI g_login_options g_access_token $ do
-      API.Response (Result cnt (ms :: [GroupRecord])) <- apiG "groups.search" [("q",g_search_string), ("v","5.44")]
-      liftIO $ printf "raw: %s\n" (show ms)
+
+      let kws = ["Handmade", "вязание", "knit"]
+      forM_ kws $ \kw -> do
+
+        (JSON{..}, API.Response (Result cnt (ms :: [GroupRecord]))) <- apiCombined "groups.search"
+              [("q",kw),
+               ("v","5.44"),
+               ("fields", "can_post,members_count"),
+               ("count", "1000")]
+
+        -- liftIO $ putStrLn (show js_aeson)
+
+        forM_ ([0..]`zip`ms) $ \(i,g@GroupRecord{..}) -> do
+          when (  gr_can_post == Just True
+               && gr_is_closed == GroupOpen) $ do
+            liftIO $ Text.hPutStrLn stderr $ Text.intercalate "," [
+                pack kw
+              , pshow (fromJust gr_members_count)
+              , pack (groupURL g)
+              , csv_quote gr_name
+              ]
+
+          return ()
+
       -- forM_ ms $ \m -> do
       --   liftIO $ printf "%s\n" (mr_format g_output_format m)
       -- liftIO $ printf "total %d\n" len
@@ -187,6 +213,12 @@ cmd (GroupQ (GroupOptions{..}))
  \___/ \__|_|_|___/
 
  -}
+
+csv_quote :: Text -> Text
+csv_quote x = "\"" `Text.append` (Text.replace "\"" "\"\"" x) `Text.append` "\""
+
+pshow :: (Show a) => a -> Text
+pshow = Text.pack . show
 
 mr_format :: String -> MusicRecord -> String
 mr_format s mr = pformat '%'

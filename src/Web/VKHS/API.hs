@@ -115,3 +115,16 @@ apiG m args = do
     Right a -> return a
     Left e -> terminate (JSONParseFailure' j e)
 
+
+apiCombined :: (Aeson.FromJSON a, MonadAPI (m (R m x)) (R m x) s)
+    => String
+    -- ^ API method name
+    -> [(String, String)]
+    -- ^ API method arguments
+    -> API m x (JSON, a)
+apiCombined m args = do
+  j@JSON{..} <- api m args
+  case Aeson.parseEither Aeson.parseJSON js_aeson of
+    Right a -> return (j,a)
+    Left e -> terminate (JSONParseFailure' j e)
+

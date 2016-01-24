@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Web.VKHS.API.Types where
 
@@ -110,7 +111,7 @@ instance FromJSON Deact where
               "banned" -> Banned
               x -> OtherDeact x
 
-data GroupType = Group | Event | Public | OtherGroupType Text
+data GroupType = Group | Event | Public
   deriving(Show,Eq,Ord)
 
 instance FromJSON GroupType where
@@ -119,8 +120,6 @@ instance FromJSON GroupType where
               "group" -> Group
               "page" -> Public
               "event" -> Event
-              x -> OtherGroupType x
-
 
 data Result a = Result {
     r_count :: Int
@@ -131,15 +130,19 @@ instance FromJSON a => FromJSON (Result a) where
   parseJSON = Aeson.withObject "Result" $ \o ->
     Result <$> o .: "count" <*> o .: "items"
 
+
+data GroupIsClosed = GroupOpen | GroupClosed | GroupPrivate
+  deriving(Show,Eq,Ord,Enum)
+
 data GroupRecord = GroupRecord {
     gr_id :: Int
-  , gr_name :: String
-  , gr_screen_name :: String
-  , gr_is_closed :: Int
+  , gr_name :: Text
+  , gr_screen_name :: Text
+  , gr_is_closed :: GroupIsClosed
   , gr_deact :: Maybe Deact
   , gr_is_admin :: Int
   , gr_admin_level :: Maybe Int
-  , gr_is_member :: Int
+  , gr_is_member :: Bool
   , gr_member_status :: Maybe Int
   , gr_invited_by :: Maybe Int
   , gr_type :: GroupType
@@ -147,6 +150,9 @@ data GroupRecord = GroupRecord {
   , gr_photo_50 :: String
   , gr_photo_100 :: String
   , gr_photo_200 :: String
+  -- arbitrary fields
+  , gr_can_post :: Maybe Bool
+  , gr_members_count :: Maybe Int
   } deriving (Show)
 
 instance FromJSON GroupRecord where
@@ -155,11 +161,11 @@ instance FromJSON GroupRecord where
       <$> (o .: "id")
       <*> (o .: "name")
       <*> (o .: "screen_name")
-      <*> (o .: "is_closed")
+      <*> fmap toEnum (o .: "is_closed")
       <*> (o .:? "deactivated")
-      <*> (o .: "is_admin")
+      <*> (o .:? "is_admin" .!= 0)
       <*> (o .:? "admin_level")
-      <*> (o .: "is_member")
+      <*> fmap (==1) (o .:? "is_member" .!= (0::Int))
       <*> (o .:? "member_status")
       <*> (o .:? "invited_by")
       <*> (o .: "type")
@@ -167,5 +173,15 @@ instance FromJSON GroupRecord where
       <*> (o .: "photo_50")
       <*> (o .: "photo_100")
       <*> (o .: "photo_200")
+      <*> (fmap (==(1::Int)) <$> (o .:? "can_post"))
+      <*> (o .:? "members_count")
   parseJSON o = parseJSON_obj_error "GroupRecord" o
+
+
+groupURL :: GroupRecord -> String
+groupURL GroupRecord{..} = "https://vk.com/" ++ urlify gr_type ++ (show gr_id) where
+  urlify Group = "club"
+  urlify Event = "event"
+  urlify Public = "page"
+
 
