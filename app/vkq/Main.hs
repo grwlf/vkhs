@@ -27,6 +27,8 @@ import Web.VKHS.Client
 import Web.VKHS.API as API
 import Web.VKHS.API.Types as API
 
+import Util
+
 data Options
   = Login LoginOptions
   | API APIOptions
@@ -204,51 +206,4 @@ cmd (GroupQ (GroupOptions{..}))
       -- forM_ ms $ \m -> do
       --   liftIO $ printf "%s\n" (mr_format g_output_format m)
       -- liftIO $ printf "total %d\n" len
-
-{-
- _   _ _   _ _
-| | | | |_(_) |___
-| | | | __| | / __|
-| |_| | |_| | \__ \
- \___/ \__|_|_|___/
-
- -}
-
-csv_quote :: Text -> Text
-csv_quote x = "\"" `Text.append` (Text.replace "\"" "\"\"" x) `Text.append` "\""
-
-pshow :: (Show a) => a -> Text
-pshow = Text.pack . show
-
-mr_format :: String -> MusicRecord -> String
-mr_format s mr = pformat '%'
-  [ ('i', show . mr_id)
-  , ('o', show . mr_owner_id)
-  , ('a', namefilter . mr_artist)
-  , ('t', namefilter . mr_title)
-  , ('d', show . mr_duration)
-  , ('u', mr_url)
-  , ('U', cutextra . mr_url)
-  ] s mr
-
-pformat :: Char -> [(Char, a->String)] -> String -> a -> String
-pformat x d s a = reverse $ scan [] s where
-  scan h (c:m:cs)
-    | c == x = scan ((reverse $ fromMaybe (const $ c:m:[]) (lookup m d) $ a)++h) cs
-    | otherwise = scan (c:h) (m:cs)
-  scan h (c:[]) = c:h
-  scan h [] = h
-
-
-trim_space = gsubRegexPR "^ +| +$" ""
-one_space = gsubRegexPR " +" " "
-normal_letters = filter (\c -> or [ isAlphaNum c , c=='-', c=='_', c==' ', c=='&'])
-html_amp = gsubRegexPR "&amp;" "&"
-no_html = gsubRegexPR re "" where
-  re = concat $ intersperse "|" [ "&[a-z]+;" , "&#[0-9]+;" ]
-
-cutextra = gsubRegexPR "\\?extra=.*" ""
-
-namefilter :: String -> String
-namefilter = trim_space . one_space . normal_letters . no_html . html_amp
 
