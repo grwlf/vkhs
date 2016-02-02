@@ -94,7 +94,7 @@ opts m =
         ( metavar "FORMAT"
         <> short 'F'
         <> value "%o_%i %U\t%t"
-        <> help "FileName format, supported tags: %i %o %a %t %d %u"
+        <> help ("Output format, supported tags:" ++ (listTags mr_tags))
         )
       <*> strOption (metavar "DIR" <> short 'o' <> help "Output directory" <> value "")
       <*> many (argument str (metavar "RECORD_ID" <> help "Download records"))
@@ -117,6 +117,12 @@ opts m =
       <$> loginOptions'
       <*> access_token_flag
       <*> strOption (long "query" <> short 'q' <> value [] <> help "Group search string")
+      <*> strOption
+        ( metavar "FORMAT"
+        <> short 'F'
+        <> value "%o_%i %U\t%t"
+        <> help ("Output format, supported tags:" ++ (listTags gr_tags))
+        )
       ))
       ( progDesc "Extract groups information"))
     )
@@ -180,30 +186,12 @@ cmd (GroupQ (GroupOptions{..}))
   |not (null g_search_string) = do
     runAPI g_login_options g_access_token $ do
 
-      let kws = ["Handmade", "вязание", "knit"]
-      forM_ kws $ \kw -> do
+      (JSON{..}, API.Response (Result cnt (grs :: [GroupRecord]))) <- apiCombined "groups.search"
+            [("q",g_search_string),
+             ("v","5.44"),
+             ("fields", "can_post,members_count"),
+             ("count", "1000")]
 
-        (JSON{..}, API.Response (Result cnt (ms :: [GroupRecord]))) <- apiCombined "groups.search"
-              [("q",kw),
-               ("v","5.44"),
-               ("fields", "can_post,members_count"),
-               ("count", "1000")]
-
-        -- liftIO $ putStrLn (show js_aeson)
-
-        forM_ ([0..]`zip`ms) $ \(i,g@GroupRecord{..}) -> do
-          when (  gr_can_post == Just True
-               && gr_is_closed == GroupOpen) $ do
-            liftIO $ Text.hPutStrLn stderr $ Text.intercalate "," [
-                pack kw
-              , pshow (fromJust gr_members_count)
-              , pack (groupURL g)
-              , csv_quote gr_name
-              ]
-
-          return ()
-
-      -- forM_ ms $ \m -> do
-      --   liftIO $ printf "%s\n" (mr_format g_output_format m)
-      -- liftIO $ printf "total %d\n" len
+      forM_ grs $ \gr -> do
+        liftIO $ printf "%s\n" (gr_format g_output_format gr)
 

@@ -167,6 +167,7 @@ data GroupOptions = GroupOptions {
     g_login_options :: LoginOptions
   , g_access_token :: String
   , g_search_string :: String
+  , g_output_format :: String
   } deriving(Show)
 
 data JSON = JSON { js_aeson :: Aeson.Value }

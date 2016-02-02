@@ -34,16 +34,31 @@ csv_quote x = "\"" `Text.append` (Text.replace "\"" "\"\"" x) `Text.append` "\""
 pshow :: (Show a) => a -> Text
 pshow = Text.pack . show
 
-mr_format :: String -> MusicRecord -> String
-mr_format s mr = pformat '%'
-  [ ('i', show . mr_id)
+listTags = intercalate " " . map (\t -> '%' : t : []) . map fst
+
+gr_tags = [
+    ('i', show . gr_id)
+  , ('m', maybe "?" show . gr_members_count)
+  , ('n', namefilter . Text.unpack . gr_name)
+  , ('s', namefilter . Text.unpack . gr_screen_name)
+  , ('u', groupURL)
+  ]
+
+gr_format :: String -> GroupRecord -> String
+gr_format s mr = pformat '%' gr_tags s mr
+
+mr_tags = [
+    ('i', show . mr_id)
   , ('o', show . mr_owner_id)
   , ('a', namefilter . mr_artist)
   , ('t', namefilter . mr_title)
   , ('d', show . mr_duration)
   , ('u', mr_url)
   , ('U', cutextra . mr_url)
-  ] s mr
+  ]
+
+mr_format :: String -> MusicRecord -> String
+mr_format s mr = pformat '%' mr_tags s mr
 
 pformat :: Char -> [(Char, a->String)] -> String -> a -> String
 pformat x d s a = reverse $ scan [] s where
