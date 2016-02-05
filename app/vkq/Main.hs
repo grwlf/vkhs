@@ -164,7 +164,7 @@ cmd (API (APIOptions{..})) = do
   runAPI a_login_options a_access_token (api a_method (splitFragments "," "=" a_args))
   return ()
 
--- Query audio files
+-- Query music files
 cmd (Music (MusicOptions{..}))
 
   |not (null m_search_string) = do

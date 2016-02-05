@@ -96,10 +96,16 @@ data WallRecord = WallRecord
 publishedAt :: WallRecord -> UTCTime
 publishedAt wr = posixSecondsToUTCTime $ fromIntegral $ wr_wdate wr
 
-data RespError = RespError
-  { error_code :: Int
-  , error_msg :: String
+data Result a = Result {
+    r_count :: Int
+  , r_items :: a
   } deriving (Show)
+
+
+-- data RespError = RespError
+--   { error_code :: Int
+--   , error_msg :: String
+--   } deriving (Show)
 
 data Deact = Banned | Deleted | OtherDeact Text
   deriving(Show,Eq,Ord)
@@ -120,11 +126,6 @@ instance FromJSON GroupType where
               "group" -> Group
               "page" -> Public
               "event" -> Event
-
-data Result a = Result {
-    r_count :: Int
-  , r_items :: a
-  } deriving (Show)
 
 instance FromJSON a => FromJSON (Result a) where
   parseJSON = Aeson.withObject "Result" $ \o ->
