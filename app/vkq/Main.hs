@@ -161,7 +161,7 @@ cmd (Login lo) = do
 
 -- API
 cmd (API (APIOptions{..})) = do
-  runAPI a_login_options a_access_token (api a_method (splitFragments "," "=" a_args))
+  runAPI a_login_options a_access_token (apiJ a_method (splitFragments "," "=" a_args))
   return ()
 
 -- Query music files
@@ -169,14 +169,14 @@ cmd (Music (MusicOptions{..}))
 
   |not (null m_search_string) = do
     runAPI m_login_options m_access_token $ do
-      API.Response (SizedList len ms) <- apiG "audio.search" [("q",m_search_string)]
+      API.Response _ (SizedList len ms) <- api "audio.search" [("q",m_search_string)]
       forM_ ms $ \m -> do
         liftIO $ printf "%s\n" (mr_format m_output_format m)
       liftIO $ printf "total %d\n" len
 
   |m_list_music = do
     runAPI m_login_options m_access_token $ do
-      (API.Response (ms :: [MusicRecord])) <- apiG "audio.get" [("q",m_search_string)]
+      (API.Response _ (ms :: [MusicRecord])) <- api "audio.get" [("q",m_search_string)]
       forM_ ms $ \m -> do
         liftIO $ printf "%s\n" (mr_format m_output_format m)
 
@@ -184,13 +184,15 @@ cmd (Music (MusicOptions{..}))
 cmd (GroupQ (GroupOptions{..}))
 
   |not (null g_search_string) = do
+
     runAPI g_login_options g_access_token $ do
 
-      (JSON{..}, API.Response (Result cnt (grs :: [GroupRecord]))) <- apiCombined "groups.search"
-            [("q",g_search_string),
-             ("v","5.44"),
-             ("fields", "can_post,members_count"),
-             ("count", "1000")]
+      API.Response _ (Many cnt (grs :: [GroupRecord])) <-
+        api "groups.search"
+          [("q",g_search_string),
+           ("v","5.44"),
+           ("fields", "can_post,members_count"),
+           ("count", "1000")]
 
       forM_ grs $ \gr -> do
         liftIO $ printf "%s\n" (gr_format g_output_format gr)

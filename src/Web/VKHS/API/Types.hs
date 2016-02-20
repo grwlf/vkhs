@@ -23,33 +23,29 @@ import Text.Printf
 -- (in Russian) for more details
 
 
-newtype Response a = Response a
+data Response a = Response {
+    resp_json :: Aeson.Value
+  , resp_data :: a
+  }
   deriving (Show, Data, Typeable)
 
 parseJSON_obj_error :: String -> Aeson.Value -> Aeson.Parser a
 parseJSON_obj_error name o = fail $
   printf "parseJSON: %s expects object, got %s" (show name) (show o)
 
-parseJSON_arr_error :: String -> Aeson.Value -> Aeson.Parser a
-parseJSON_arr_error name o = fail $
-  printf "parseJSON: %s expects array, got %s" (show name) (show o)
-
 instance (FromJSON a) => FromJSON (Response a) where
-  parseJSON (Aeson.Object v) = do
-    a <- v .: "response"
-    x <- Aeson.parseJSON a
-    return (Response x)
-  parseJSON o = parseJSON_obj_error "Response" o
+  parseJSON j = Aeson.withObject "Response" (\o ->
+    Response <$> pure j <*> o .: "response") j
 
+-- Deprecated
 data SizedList a = SizedList Int [a]
   deriving(Show, Data, Typeable)
 
 instance (FromJSON a) => FromJSON (SizedList a) where
-  parseJSON (Aeson.Array v) = do
+  parseJSON = Aeson.withArray "SizedList" $ \v -> do
     n <- Aeson.parseJSON (Vector.head v)
     t <- Aeson.parseJSON (Aeson.Array (Vector.tail v))
     return (SizedList n t)
-  parseJSON o = parseJSON_arr_error "SizedList" o
 
 data MusicRecord = MusicRecord
   { mr_id :: Int
@@ -61,15 +57,14 @@ data MusicRecord = MusicRecord
   } deriving (Show, Data, Typeable)
 
 instance FromJSON MusicRecord where
-  parseJSON (Aeson.Object o) =
+  parseJSON = Aeson.withObject "MusicRecord" (\o ->
     MusicRecord
       <$> (o .: "aid")
       <*> (o .: "owner_id")
       <*> (o .: "artist")
       <*> (o .: "title")
       <*> (o .: "duration")
-      <*> (o .: "url")
-  parseJSON o = parseJSON_obj_error "MusicRecord" o
+      <*> (o .: "url"))
 
 
 data UserRecord = UserRecord
@@ -96,16 +91,19 @@ data WallRecord = WallRecord
 publishedAt :: WallRecord -> UTCTime
 publishedAt wr = posixSecondsToUTCTime $ fromIntegral $ wr_wdate wr
 
-data Result a = Result {
-    r_count :: Int
-  , r_items :: a
+{-
+ - API version 5.44
+ -}
+
+data Many a = Many {
+    m_count :: Int
+  , m_items :: a
   } deriving (Show)
 
+instance FromJSON a => FromJSON (Many a) where
+  parseJSON = Aeson.withObject "Result" (\o ->
+    Many <$> o .: "count" <*> o .: "items")
 
--- data RespError = RespError
---   { error_code :: Int
---   , error_msg :: String
---   } deriving (Show)
 
 data Deact = Banned | Deleted | OtherDeact Text
   deriving(Show,Eq,Ord)
@@ -126,10 +124,6 @@ instance FromJSON GroupType where
               "group" -> Group
               "page" -> Public
               "event" -> Event
-
-instance FromJSON a => FromJSON (Result a) where
-  parseJSON = Aeson.withObject "Result" $ \o ->
-    Result <$> o .: "count" <*> o .: "items"
 
 
 data GroupIsClosed = GroupOpen | GroupClosed | GroupPrivate
@@ -157,7 +151,7 @@ data GroupRecord = GroupRecord {
   } deriving (Show)
 
 instance FromJSON GroupRecord where
-  parseJSON (Aeson.Object o) =
+  parseJSON = Aeson.withObject "GroupRecord" $ \o ->
     GroupRecord
       <$> (o .: "id")
       <*> (o .: "name")
@@ -176,7 +170,6 @@ instance FromJSON GroupRecord where
       <*> (o .: "photo_200")
       <*> (fmap (==(1::Int)) <$> (o .:? "can_post"))
       <*> (o .:? "members_count")
-  parseJSON o = parseJSON_obj_error "GroupRecord" o
 
 
 groupURL :: GroupRecord -> String
