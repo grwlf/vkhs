@@ -251,8 +251,15 @@ requestExecute Request{..} = do
 
   liftIO $ do
     Pipes.withHTTP req cl_man $ \resp -> do
-    resp_body <- PP.foldM (\a b -> return $ BS.append a b) (return BS.empty) return (Client.responseBody resp)
-    now <- getCurrentTime
-    let (jar', resp') = Client.updateCookieJar resp req now jar
-    return (Response resp resp_body, Cookies jar')
+      resp_body <- PP.foldM (\a b -> return $ BS.append a b) (return BS.empty) return (Client.responseBody resp)
+      now <- getCurrentTime
+      let (jar', resp') = Client.updateCookieJar resp req now jar
+      return (Response resp resp_body, Cookies jar')
+
+downloadFileWith :: (MonadClient m s) => URL -> (ByteString -> IO ()) -> m ()
+downloadFileWith url h = do
+  (ClientState{..}) <- toClientState <$> get
+  (Right Request{..}) <- requestCreateGet url (cookiesCreate ())
+  liftIO $ Pipes.withHTTP req cl_man $ \resp -> do
+      PP.foldM (\() a -> h a) (return ()) (const (return ())) (Client.responseBody resp)
 
