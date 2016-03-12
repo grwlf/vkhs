@@ -125,6 +125,12 @@ urlCreate :: URL_Protocol -> URL_Host -> Maybe URL_Port -> URL_Path -> URL_Query
 urlCreate URL_Protocol{..} URL_Host{..} port  URL_Path{..} URL_Query{..} =
   pure $ URL $ Client.URI (urlproto ++ ":") (Just (Client.URIAuth "" urlh (maybe "" ((":"++).urlp) port))) urlpath urlq []
 
+urlFromString :: String -> Either Error URL
+urlFromString s =
+  case Client.parseURI s of
+    Nothing -> Left (ErrorParseURL s "Client.parseURI failed")
+    Just u -> Right (URL u)
+
 splitFragments :: String -> String -> String -> [(String,String)]
 splitFragments sep eqs =
     filter (\(a, b) -> not (null a))

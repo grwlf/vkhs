@@ -146,7 +146,7 @@ data MusicOptions = MusicOptions {
   , m_search_string :: String
   , m_name_format :: String
   , m_output_format :: String
-  , m_out_dir :: String
+  , m_out_dir :: Maybe String
   , m_records_id :: [String]
   , m_skip_existing :: Bool
   } deriving(Show)

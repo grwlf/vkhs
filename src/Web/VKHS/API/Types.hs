@@ -22,7 +22,6 @@ import Text.Printf
 -- See http://vk.com/developers.php?oid=-1&p=Авторизация_клиентских_приложений
 -- (in Russian) for more details
 
-
 data Response a = Response {
     resp_json :: Aeson.Value
   , resp_data :: a
@@ -53,7 +52,7 @@ data MusicRecord = MusicRecord
   , mr_artist :: String
   , mr_title :: String
   , mr_duration :: Int
-  , mr_url :: String
+  , mr_url_str :: String
   } deriving (Show, Data, Typeable)
 
 instance FromJSON MusicRecord where

@@ -14,6 +14,8 @@ import Data.Char
 import Data.Text(Text(..),pack)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
+import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as BS
 import Options.Applicative
 import System.Environment
 import System.Exit
@@ -23,7 +25,8 @@ import Text.Printf
 
 import Web.VKHS
 import Web.VKHS.Types
-import Web.VKHS.Client
+import Web.VKHS.Client as Client
+import Web.VKHS.Monad hiding (catch)
 import Web.VKHS.API as API
 import Web.VKHS.API.Types as API
 
@@ -62,6 +65,9 @@ loginOptions' = LoginOptions
   <*> strOption (long "user" <> value "" <> metavar "STR" <> help "User name or email")
   <*> strOption (long "pass" <> value "" <> metavar "STR" <> help "Password")
 
+toMaybe :: (Functor f) => f String -> f (Maybe String)
+toMaybe = fmap (\s -> if s == "" then Nothing else Just s)
+
 opts m =
   let access_token_flag = strOption (short 'a' <> m <> metavar "ACCESS_TOKEN" <>
         help "Access token. Honores VKQ_ACCESS_TOKEN environment variable")
@@ -96,7 +102,7 @@ opts m =
         <> value "%o_%i %U\t%t"
         <> help ("Output format, supported tags:" ++ (listTags mr_tags))
         )
-      <*> strOption (metavar "DIR" <> short 'o' <> help "Output directory" <> value "")
+      <*> toMaybe (strOption (metavar "DIR" <> short 'o' <> help "Output directory" <> value ""))
       <*> many (argument str (metavar "RECORD_ID" <> help "Download records"))
       <*> flag False True (long "skip-existing" <> help "Don't download existing files")
       ))
@@ -164,21 +170,59 @@ cmd (API (APIOptions{..})) = do
   runAPI a_login_options a_access_token (apiJ a_method (splitFragments "," "=" a_args))
   return ()
 
--- Query music files
-cmd (Music (MusicOptions{..}))
+cmd (Music (mo@MusicOptions{..}))
 
+  -- Query music files
   |not (null m_search_string) = do
     runAPI m_login_options m_access_token $ do
       API.Response _ (SizedList len ms) <- api "audio.search" [("q",m_search_string)]
       forM_ ms $ \m -> do
-        liftIO $ printf "%s\n" (mr_format m_output_format m)
-      liftIO $ printf "total %d\n" len
+        io $ printf "%s\n" (mr_format m_output_format m)
+      io $ printf "total %d\n" len
 
+  -- List music files
   |m_list_music = do
     runAPI m_login_options m_access_token $ do
       (API.Response _ (ms :: [MusicRecord])) <- api "audio.get" [("q",m_search_string)]
       forM_ ms $ \m -> do
-        liftIO $ printf "%s\n" (mr_format m_output_format m)
+        io $ printf "%s\n" (mr_format m_output_format m)
+
+  -- Download music files
+  |not (null m_records_id) = do
+    let out_dir = fromMaybe "." m_out_dir
+    runAPI m_login_options m_access_token $ do
+      (API.Response _ (ms :: [MusicRecord])) <- api "audio.getById" [("audios", concat $ intersperse "," m_records_id)]
+      forM_ ms $ \mr@MusicRecord{..} -> do
+        (f, mh) <- liftIO $ openFileMR mo mr
+        case mh of
+          Just h -> do
+            u <- ensure (pure $ Client.urlFromString mr_url_str)
+            r <- Client.downloadFileWith u (BS.hPut h)
+            io $ printf "%d_%d\n" mr_owner_id mr_id
+            io $ printf "%s\n" mr_title
+            io $ printf "%s\n" f
+          Nothing -> do
+            io $ hPutStrLn stderr ("File " ++ f ++ " already exist, skipping")
+        return ()
+
+
+-- Download audio files
+-- cmd (Options v (Music (MO act False [] _ ofmt odir rid sk))) = do
+--   let e = (envcall act) { verbose = v }
+--   Response (ms :: [MusicRecord]) <- api_ e "audio.getById" [("audios", concat $ intersperse "," rid)]
+--   forM_ ms $ \m -> do
+--     (fp, mh) <- openFileMR odir sk ofmt m
+--     case mh of
+--       Just h -> do
+--         r <- vk_curl_file e (url m) $ \ bs -> do
+--           BS.hPut h bs
+--         checkRight r
+--         printf "%d_%d\n" (owner_id m) (aid m)
+--         printf "%s\n" (title m)
+--         printf "%s\n" fp
+--       Nothing -> do
+--         hPutStrLn stderr (printf "File %s already exist, skipping" fp)
+--     return ()
 
 -- Query groups files
 cmd (GroupQ (GroupOptions{..}))

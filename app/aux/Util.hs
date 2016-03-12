@@ -10,8 +10,12 @@ import Data.List
 import Data.Text(Text(..),pack)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
+import Control.Monad
+import Control.Monad.Trans
 import System.Environment
+import System.FilePath
 import System.Exit
+import System.Directory
 import System.IO
 import Text.RegexPR
 import Text.Printf
@@ -53,8 +57,8 @@ mr_tags = [
   , ('a', namefilter . mr_artist)
   , ('t', namefilter . mr_title)
   , ('d', show . mr_duration)
-  , ('u', mr_url)
-  , ('U', cutextra . mr_url)
+  , ('u', mr_url_str)
+  , ('U', cutextra . mr_url_str)
   ]
 
 mr_format :: String -> MusicRecord -> String
@@ -80,4 +84,34 @@ cutextra = gsubRegexPR "\\?extra=.*" ""
 
 namefilter :: String -> String
 namefilter = trim_space . one_space . normal_letters . no_html . html_amp
+
+
+-- Open file. Return filename and handle. Don't open file if it exists
+openFileMR :: MusicOptions -> MusicRecord -> IO (FilePath, Maybe Handle)
+openFileMR mo@MusicOptions{..} mr@MusicRecord{..} =
+  case m_out_dir of
+    Nothing -> do
+      let (_,ext) = splitExtension (mr_url_str)
+      temp <- getTemporaryDirectory
+      (fp,h) <- openBinaryTempFile temp ("vkqmusic"++ext)
+      return (fp, Just h)
+    Just odir -> do
+      let (_,ext) = splitExtension mr_url_str
+      let name = mr_format m_output_format mr
+      let name' = replaceExtension name (takeWhile (/='?') ext)
+      let fp =  (odir </> name')
+      e <- doesFileExist fp
+      case (e && m_skip_existing) of
+        True -> do
+          return (fp,Nothing)
+        False -> do
+          h <- openBinaryFile fp WriteMode
+          return (fp,Just h)
+
+io :: (MonadIO m) => IO a -> m a
+io = liftIO
+
+printio, printerr :: (MonadIO m) => String -> m ()
+printio = liftIO . hPutStrLn stdout
+printerr = liftIO . hPutStrLn stderr
 
