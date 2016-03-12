@@ -49,7 +49,9 @@ library
                      optparse-applicative,
                      aeson,
                      EitherT,
-                     vector
+                     vector,
+                     filepath,
+                     directory
 
 
 executable vkq
