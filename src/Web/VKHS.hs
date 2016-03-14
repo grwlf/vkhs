@@ -54,10 +54,13 @@ instance API.ToAPIState State where
 instance ToGenericOptions State where
   toGenericOptions = go
 
-initialState :: LoginOptions -> EitherT String IO State
-initialState lo =
-  let go = l_generic lo in
-  State <$> lift (Client.defaultState go) <*> pure (Login.defaultState lo) <*> pure API.defaultState <*> pure go
+initialState :: GenericOptions -> EitherT String IO State
+initialState go = State
+  <$> lift (Client.defaultState go)
+  <*> pure (Login.defaultState go)
+  <*> pure (API.defaultState)
+  <*> pure go
+
 
 newtype VK r a = VK { unVK :: Guts VK (StateT State (EitherT String IO)) r a }
   deriving(MonadIO, Functor, Applicative, Monad, MonadState State, MonadReader (r -> VK r r) , MonadCont)
@@ -98,20 +101,20 @@ defaultSuperviser = go where
         liftIO $ putStrLn $ "Unsupervised error: " ++ res_desc
         lift $ left res_desc
 
-runLogin lo = do
-  s <- initialState lo
+runLogin go = do
+  s <- initialState go
   evalStateT (defaultSuperviser (login >>= return . Fine)) s
 
 
-runAPI login_options access_token m = do
-  s <- initialState login_options
+runAPI go@GenericOptions{..} m = do
+  s <- initialState go
   flip evalStateT s $ do
-  case (null access_token) of
+  case (null l_access_token) of
     True -> do
       AccessToken{..} <- defaultSuperviser (login >>= return . Fine)
       modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
     False -> do
-      modify $ modifyAPIState (\as -> as{api_access_token = access_token})
+      modify $ modifyAPIState (\as -> as{api_access_token = l_access_token})
   defaultSuperviser (m >>= return . Fine)
 
 

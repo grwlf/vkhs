@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 module Web.VKHS.Types where
 
 import Data.List
@@ -76,37 +78,9 @@ allAccess =
 newtype AppID = AppID { aid_string :: String }
   deriving(Show, Eq, Ord)
 
-data GenericOptions = GenericOptions {
-    o_login_host :: String
-  , o_api_host :: String
-  , o_port :: Int
-  , o_verbose :: Bool
-  , o_use_https :: Bool
-  , o_max_request_rate_per_sec :: Rational
-  -- ^ How many requests per second is allowed
-  , o_allow_interactive :: Bool
-  } deriving(Show)
 
-defaultOptions = GenericOptions {
-    o_login_host = "oauth.vk.com"
-  , o_api_host = "api.vk.com"
-  , o_port = 443
-  , o_verbose = False
-  , o_use_https = True
-  , o_max_request_rate_per_sec = 3
-  , o_allow_interactive = True
-  }
-
-class ToGenericOptions s where
-  toGenericOptions :: s -> GenericOptions
-
--- defaultOptions = Options {
---     o_host = "oauth.vk.com"
---   , o_port = 80
---   , o_verbose = False
---   , o_use_https = False
---   }
-
+data JSON = JSON { js_aeson :: Aeson.Value }
+  deriving(Show)
 
 data Form = Form {
     form_title :: String
@@ -119,30 +93,56 @@ data FilledForm = FilledForm {
   } deriving(Show)
 
 
-data Verbosity = Normal | Trace | Debug
-  deriving(Enum,Eq,Ord,Show)
+data GenericOptions = GenericOptions {
+    o_login_host :: String
+  , o_api_host :: String
+  , o_port :: Int
+  , o_verbose :: Bool
+  , o_use_https :: Bool
+  , o_max_request_rate_per_sec :: Rational
+  -- ^ How many requests per second is allowed
+  , o_allow_interactive :: Bool
 
-data LoginOptions = LoginOptions {
-    l_generic :: GenericOptions
   , l_appid :: AppID
   , l_username :: String
   -- ^ Empty string means no value is given
   , l_password :: String
   -- ^ Empty string means no value is given
+  , l_access_token :: String
   } deriving(Show)
 
+defaultOptions = GenericOptions {
+    o_login_host = "oauth.vk.com"
+  , o_api_host = "api.vk.com"
+  , o_port = 443
+  , o_verbose = False
+  , o_use_https = True
+  , o_max_request_rate_per_sec = 3
+  , o_allow_interactive = True
+
+  , l_appid  = AppID "3128877"
+  , l_username = ""
+  -- ^ Empty string means no value is given
+  , l_password = ""
+  -- ^ Empty string means no value is given
+  , l_access_token = ""
+  }
+
+class ToGenericOptions s where
+  toGenericOptions :: s -> GenericOptions
+
+data Verbosity = Normal | Trace | Debug
+  deriving(Enum,Eq,Ord,Show)
+
+
+-- FIXME: move to app-specific folder
 data APIOptions = APIOptions {
-    a_login_options :: LoginOptions
-  , a_access_token :: String
-  , a_parse :: Bool
-  , a_method :: String
+    a_method :: String
   , a_args :: String
   } deriving(Show)
 
 data MusicOptions = MusicOptions {
-    m_login_options :: LoginOptions
-  , m_access_token :: String
-  , m_list_music :: Bool
+    m_list_music :: Bool
   , m_search_string :: String
   , m_name_format :: String
   , m_output_format :: String
@@ -152,24 +152,15 @@ data MusicOptions = MusicOptions {
   } deriving(Show)
 
 data UserOptions = UserOptions {
-    u_login_options :: LoginOptions
-  , u_access_token :: String
-  , u_queryString :: String
+    u_queryString :: String
   } deriving(Show)
 
 data WallOptions = WallOptions {
-    w_login_options :: LoginOptions
-  , w_access_token :: String
-  , w_woid :: String
+    w_woid :: String
   } deriving(Show)
 
 data GroupOptions = GroupOptions {
-    g_login_options :: LoginOptions
-  , g_access_token :: String
-  , g_search_string :: String
+    g_search_string :: String
   , g_output_format :: String
   } deriving(Show)
-
-data JSON = JSON { js_aeson :: Aeson.Value }
-  deriving(Show)
 

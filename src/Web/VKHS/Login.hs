@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FunctionalDependencies #-}
 module Web.VKHS.Login where
 
@@ -41,10 +42,11 @@ data LoginState = LoginState {
   , ls_formdata :: [(String,String)]
   -- ^ Dictionary containig inputID/value map for filling forms
   , ls_input_sets :: [[String]]
-  -- ^ Empty inputs seen so far.
-  } deriving (Show)
+  }
 
-defaultState LoginOptions{..} = LoginState {
+defaultState :: GenericOptions -> LoginState
+defaultState go@GenericOptions{..} =
+  LoginState {
     ls_rights = allAccess
   , ls_appid = l_appid
   , ls_formdata = (if not (null l_username) then [("email", l_username)] else [])
@@ -52,7 +54,7 @@ defaultState LoginOptions{..} = LoginState {
   , ls_input_sets = []
   }
 
-class ToGenericOptions s => ToLoginState s where
+class (ToGenericOptions s) => ToLoginState s where
   toLoginState :: s -> LoginState
   modifyLoginState :: (LoginState -> LoginState) -> (s -> s)
 
@@ -70,8 +72,8 @@ type Login m x a = m (R m x) a
 
 initialAction :: (MonadLogin (m (R m x)) (R m x) s) => Login m x RobotAction
 initialAction = do
-  LoginState{..} <- toLoginState <$> get
-  GenericOptions{..} <- toGenericOptions <$> get
+  LoginState{..} <- gets toLoginState
+  GenericOptions{..} <- gets toGenericOptions
   let
     protocol = (case o_use_https of
                   True -> "https"
@@ -104,7 +106,7 @@ printForm prefix Shpider.Form{..} =
 fillForm :: (MonadLogin (m (R m x)) (R m x) s) => Form -> Login m x FilledForm
 fillForm f@(Form{..}) = do
     LoginState{..} <- toLoginState <$> get
-    GenericOptions{..} <- toGenericOptions <$> get
+    GenericOptions{..} <- gets toGenericOptions
     let empty_inputs = Shpider.emptyInputs form
     case empty_inputs `elem` ls_input_sets of
       False -> do

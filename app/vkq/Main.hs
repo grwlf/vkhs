@@ -33,60 +33,48 @@ import Web.VKHS.API.Types as API
 import Util
 
 data Options
-  = Login LoginOptions
-  | API APIOptions
-  | Music MusicOptions
-  | UserQ UserOptions
-  | WallQ WallOptions
-  | GroupQ GroupOptions
+  = Login GenericOptions
+  | API GenericOptions APIOptions
+  | Music GenericOptions MusicOptions
+  | UserQ GenericOptions UserOptions
+  | WallQ GenericOptions WallOptions
+  | GroupQ GenericOptions GroupOptions
   deriving(Show)
-
-genericOptions :: Parser GenericOptions
-genericOptions = GenericOptions
-  <$> (pure $ o_login_host defaultOptions)
-  <*> (pure $ o_api_host defaultOptions)
-  <*> (pure $ o_port defaultOptions)
-  <*> flag False True (long "verbose" <> help "Be verbose")
-  <*> (pure $ o_use_https defaultOptions)
-  <*> fmap read (strOption (value (show $ o_max_request_rate_per_sec defaultOptions) <> long "req-per-sec" <> metavar "N" <> help "Max number of requests per second"))
-  <*> flag True False (long "interactive" <> help "Allow interactive queries")
-
-loginOptions :: Parser LoginOptions
-loginOptions = LoginOptions
-  <$> genericOptions
-  <*> (AppID <$> strOption (long "appid" <> metavar "APPID" <> value "3128877" <> help "Application ID, defaults to VKHS" ))
-  <*> argument str (metavar "USER" <> help "User name or email")
-  <*> argument str (metavar "PASS" <> help "User password")
-
-loginOptions' :: Parser LoginOptions
-loginOptions' = LoginOptions
-  <$> genericOptions
-  <*> (AppID <$> strOption (long "appid" <> metavar "APPID" <> value "3128877" <> help "Application ID, defaults to VKHS" ))
-  <*> strOption (long "user" <> value "" <> metavar "STR" <> help "User name or email")
-  <*> strOption (long "pass" <> value "" <> metavar "STR" <> help "Password")
 
 toMaybe :: (Functor f) => f String -> f (Maybe String)
 toMaybe = fmap (\s -> if s == "" then Nothing else Just s)
 
 opts m =
-  let access_token_flag = strOption (short 'a' <> m <> metavar "ACCESS_TOKEN" <>
-        help "Access token. Honores VKQ_ACCESS_TOKEN environment variable")
-      api_cmd = (info (API <$> (APIOptions
-        <$> loginOptions'
-        <*> access_token_flag
-        <*> switch (long "preparse" <> short 'p' <> help "Preparse into Aeson format")
-        <*> argument str (metavar "METHOD" <> help "Method name")
+  let
+
+      genericOptions :: Parser GenericOptions
+      genericOptions = GenericOptions
+        <$> (pure $ o_login_host defaultOptions)
+        <*> (pure $ o_api_host defaultOptions)
+        <*> (pure $ o_port defaultOptions)
+        <*> flag False True (long "verbose" <> help "Be verbose")
+        <*> (pure $ o_use_https defaultOptions)
+        <*> fmap read (strOption (value (show $ o_max_request_rate_per_sec defaultOptions) <> long "req-per-sec" <> metavar "N" <> help "Max number of requests per second"))
+        <*> flag True False (long "interactive" <> help "Allow interactive queries")
+
+        <*> (AppID <$> strOption (long "appid" <> metavar "APPID" <> value "3128877" <> help "Application ID, defaults to VKHS" ))
+        <*> argument str (metavar "USER" <> help "User name or email")
+        <*> argument str (metavar "PASS" <> help "User password")
+        <*> strOption (short 'a' <> m <> metavar "ACCESS_TOKEN" <>
+              help "Access token. Honores VKQ_ACCESS_TOKEN environment variable")
+
+      api_cmd = (info (API <$> genericOptions <*> (APIOptions
+        <$> argument str (metavar "METHOD" <> help "Method name")
         <*> argument str (metavar "PARAMS" <> help "Method arguments, KEY=VALUE[,KEY2=VALUE2[,,,]]")))
         ( progDesc "Call VK API method" ))
+
   in subparser (
-    command "login" (info (Login <$> loginOptions)
-      ( progDesc "Login and print access token (also prints user_id and expiration time)" ))
+       command "login" (info (Login <$> genericOptions)
+         ( progDesc "Login and print access token (also prints user_id and expiration time)" ))
     <> command "call" api_cmd
     <> command "api" api_cmd
-    <> command "music" (info ( Music <$> (MusicOptions
-      <$> loginOptions'
-      <*> access_token_flag
-      <*> switch (long "list" <> short 'l' <> help "List music files")
+    <> command "music" (info ( Music <$> genericOptions <*> (MusicOptions
+      <$> switch (long "list" <> short 'l' <> help "List music files")
       <*> strOption
         ( metavar "STR"
         <> long "query" <> short 'q' <> value [] <> help "Query string")
@@ -107,22 +95,19 @@ opts m =
       <*> flag False True (long "skip-existing" <> help "Don't download existing files")
       ))
       ( progDesc "List or download music files"))
-    <> command "user" (info ( UserQ <$> (UserOptions
-      <$> loginOptions'
-      <*> access_token_flag
-      <*> strOption (long "query" <> short 'q' <> help "String to query")
+
+    <> command "user" (info ( UserQ <$> genericOptions <*> (UserOptions
+      <$> strOption (long "query" <> short 'q' <> help "String to query")
       ))
       ( progDesc "Extract various user information"))
-    <> command "wall" (info ( WallQ <$> (WallOptions
-      <$> loginOptions'
-      <*> access_token_flag
-      <*> strOption (long "id" <> short 'i' <> help "Owner id")
+
+    <> command "wall" (info ( WallQ <$> genericOptions <*> (WallOptions
+      <$> strOption (long "id" <> short 'i' <> help "Owner id")
       ))
       ( progDesc "Extract wall information"))
-    <> command "group" (info ( GroupQ <$> (GroupOptions
-      <$> loginOptions'
-      <*> access_token_flag
-      <*> strOption (long "query" <> short 'q' <> value [] <> help "Group search string")
+
+    <> command "group" (info ( GroupQ <$> genericOptions <*> (GroupOptions
+      <$> strOption (long "query" <> short 'q' <> value [] <> help "Group search string")
       <*> strOption
         ( metavar "FORMAT"
         <> short 'F'
@@ -166,15 +151,15 @@ cmd (Login lo) = do
   liftIO $ putStrLn at_access_token
 
 -- API
-cmd (API (APIOptions{..})) = do
-  runAPI a_login_options a_access_token (apiJ a_method (splitFragments "," "=" a_args))
+cmd (API go APIOptions{..}) = do
+  runAPI go (apiJ a_method (splitFragments "," "=" a_args))
   return ()
 
-cmd (Music (mo@MusicOptions{..}))
+cmd (Music go@GenericOptions{..} mo@MusicOptions{..})
 
   -- Query music files
   |not (null m_search_string) = do
-    runAPI m_login_options m_access_token $ do
+    runAPI go $ do
       API.Response _ (SizedList len ms) <- api "audio.search" [("q",m_search_string)]
       forM_ ms $ \m -> do
         io $ printf "%s\n" (mr_format m_output_format m)
@@ -182,7 +167,7 @@ cmd (Music (mo@MusicOptions{..}))
 
   -- List music files
   |m_list_music = do
-    runAPI m_login_options m_access_token $ do
+    runAPI go $ do
       (API.Response _ (ms :: [MusicRecord])) <- api "audio.get" [("q",m_search_string)]
       forM_ ms $ \m -> do
         io $ printf "%s\n" (mr_format m_output_format m)
@@ -190,7 +175,7 @@ cmd (Music (mo@MusicOptions{..}))
   -- Download music files
   |not (null m_records_id) = do
     let out_dir = fromMaybe "." m_out_dir
-    runAPI m_login_options m_access_token $ do
+    runAPI go $ do
       (API.Response _ (ms :: [MusicRecord])) <- api "audio.getById" [("audios", concat $ intersperse "," m_records_id)]
       forM_ ms $ \mr@MusicRecord{..} -> do
         (f, mh) <- liftIO $ openFileMR mo mr
@@ -225,11 +210,11 @@ cmd (Music (mo@MusicOptions{..}))
 --     return ()
 
 -- Query groups files
-cmd (GroupQ (GroupOptions{..}))
+cmd (GroupQ go (GroupOptions{..}))
 
   |not (null g_search_string) = do
 
-    runAPI g_login_options g_access_token $ do
+    runAPI go $ do
 
       API.Response _ (Many cnt (grs :: [GroupRecord])) <-
         api "groups.search"
