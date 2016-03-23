@@ -33,6 +33,7 @@ import Web.VKHS.Monad
 import Web.VKHS.Error
 
 import Debug.Trace
+import System.IO
 
 data LoginState = LoginState {
     ls_rights :: [AccessRight]
@@ -136,12 +137,12 @@ fillForm f@(Form{..}) = do
 
 actionRequest :: (MonadLogin (m (R m x)) (R m x) s) => RobotAction -> Login m x (Response, Cookies)
 actionRequest a@(DoGET url jar) = do
-  liftIO $ putStrLn $ printAction "> " a
+  debug (printAction "> " a)
   req <- ensure $ requestCreateGet url jar
   (res, jar') <- requestExecute req
   return (res, jar')
 actionRequest a@(DoPOST form jar) = do
-  liftIO $ putStrLn $ printAction "> " a
+  debug (printAction "> " a)
   req <- ensure $ requestCreatePost form jar
   (res, jar') <- requestExecute req
   return (res, jar')
@@ -153,11 +154,11 @@ analyzeResponse (res, jar) = do
       title = Shpider.gatherTitle tags
       forms = map (Form title) (Shpider.gatherForms tags)
   dumpResponseBody "latest.html" res
-  liftIO $ putStrLn $ "< 0 Title: " ++ title
+  debug ("< 0 Title: " ++ title)
 
   case (responseRedirect res) of
     Just url -> do
-      liftIO $ putStrLn $ "< 0 Fragments: " ++ show (urlFragments url)
+      debug $ "< 0 Fragments: " ++ show (urlFragments url)
       maybe (return $ Left $ DoGET url jar) (\x -> return $ Right x) $ do
         at_access_token <- lookup "access_token" (urlFragments url)
         at_user_id <-  lookup "user_id" (urlFragments url)
@@ -168,13 +169,13 @@ analyzeResponse (res, jar) = do
         [] -> do
           terminate LoginActionsExhausted
         (f:[]) -> do
-           liftIO $ putStrLn $ printForm "< 0 " $ form f
+           debug $ printForm "< 0 " $ form f
            ff <- fillForm f
            return $ Left (DoPOST ff jar)
         fs -> do
           forM_ (fs`zip`[0..]) $ \(f,n) -> do
             ff <- fillForm f
-            liftIO $ putStrLn $ printForm ("< " ++ (show n) ++ " ") $ fform ff
+            debug $ printForm ("< " ++ (show n) ++ " ") $ fform ff
           terminate LoginActionsExhausted
 
 login :: (MonadLogin (m (R m x)) (R m x) s) => Login m x AccessToken

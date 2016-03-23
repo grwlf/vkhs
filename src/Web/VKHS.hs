@@ -84,21 +84,21 @@ defaultSuperviser = go where
     case res of
       Fine a -> return a
       UnexpectedInt e k -> do
-        liftIO (putStrLn "Int!")
+        alert "UnexpectedInt (ignoring)"
         go (k 0)
       UnexpectedFormField (Form tit f) i k -> do
-        liftIO $ putStrLn $ "While filling form " ++ (printForm "" f)
+        alert $ "While filling form " ++ (printForm "" f)
         case o_allow_interactive of
           True -> do
             v <- liftIO $ do
-              putStrLn $ "Please, enter the correct value for input " ++ i ++ " : "
+              liftIO $ hPutStrLn stderr $ "Please, enter the correct value for input " ++ i ++ " : "
               getLine
             go (k v)
           False -> do
-            liftIO $ putStrLn $ "Unable to query value for " ++ i ++ " since interactive mode is disabled"
+            alert $ "Unable to query value for " ++ i ++ " since interactive mode is disabled"
             lift $ left res_desc
       _ -> do
-        liftIO $ putStrLn $ "Unsupervised error: " ++ res_desc
+        alert $ "Unsupervised error: " ++ res_desc
         lift $ left res_desc
 
 runLogin go = do

@@ -95,7 +95,7 @@ apiJ mname margs = do
           (URL_Path ("/method/" ++ mname))
           (buildQuery (("access_token", l_access_token):margs)))
 
-  liftIO $ putStrLn $ "> " ++ (show url)
+  debug $ "> " ++ (show url)
 
   req <- ensure (requestCreateGet url (cookiesCreate ()))
   (res, jar') <- requestExecute req

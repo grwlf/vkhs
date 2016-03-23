@@ -58,8 +58,8 @@ toMaybe = fmap (\s -> if s == "" then Nothing else Just s)
 opts m =
   let
 
-      genericOptions :: Parser GenericOptions
-      genericOptions = GenericOptions
+      -- genericOptions_ :: Parser GenericOptions
+      genericOptions_ puser ppass = GenericOptions
         <$> (pure $ o_login_host defaultOptions)
         <*> (pure $ o_api_host defaultOptions)
         <*> (pure $ o_port defaultOptions)
@@ -69,10 +69,19 @@ opts m =
         <*> flag True False (long "interactive" <> help "Allow interactive queries")
 
         <*> (AppID <$> strOption (long "appid" <> metavar "APPID" <> value "3128877" <> help "Application ID, defaults to VKHS" ))
-        <*> argument str (metavar "USER" <> help "User name or email")
-        <*> argument str (metavar "PASS" <> help "User password")
+        <*> puser
+        <*> ppass
         <*> strOption (short 'a' <> m <> metavar "ACCESS_TOKEN" <>
               help ("Access token. Honores " ++ env_access_token ++ " environment variable"))
+
+      genericOptions = genericOptions_
+        (strOption (value "" <> long "user" <> metavar "USER" <> help "User name or email"))
+        (strOption (value "" <> long "pass" <> metavar "PASS" <> help "User password"))
+
+      genericOptions_login = genericOptions_
+        (argument str (metavar "USER" <> help "User name or email"))
+        (argument str (metavar "PASS" <> help "User password"))
+
 
       api_cmd = (info (API <$> genericOptions <*> (APIOptions
         <$> argument str (metavar "METHOD" <> help "Method name")
@@ -80,7 +89,7 @@ opts m =
         ( progDesc "Call VK API method" ))
 
   in subparser (
-       command "login" (info (Login <$> genericOptions <*> (LoginOptions
+       command "login" (info (Login <$> genericOptions_login <*> (LoginOptions
       <$> flag False True (long "eval" <> help "Print in shell-friendly format")
       ))
       ( progDesc "Login and print access token" ))

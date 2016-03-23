@@ -21,6 +21,7 @@ import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Cont
 import Data.Default.Class
+import System.IO
 
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -81,4 +82,15 @@ instance (MonadVK (t (R t x)) (R t x)) => EnsureVK t (R t x) (Either Client.Erro
 --     case x of
 --       (Right u) -> return u
 --       (Left e) -> raiseError (\k -> UnexpectedURL e k)
+
+
+debug :: (ToGenericOptions s, MonadState s m, MonadIO m) => String -> m ()
+debug str = do
+  GenericOptions{..} <- gets toGenericOptions
+  when o_verbose $ do
+    liftIO $ hPutStrLn stderr str
+
+alert :: (ToGenericOptions s, MonadState s m, MonadIO m) => String -> m ()
+alert str = do
+    liftIO $ hPutStrLn stderr str
 
