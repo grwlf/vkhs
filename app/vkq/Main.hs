@@ -176,7 +176,9 @@ cmd (Login go LoginOptions{..}) = do
 
 -- API
 cmd (API go APIOptions{..}) = do
-  runAPI go (apiJ a_method (splitFragments "," "=" a_args))
+  runAPI go $ do
+    x <- apiJ a_method (splitFragments "," "=" a_args)
+    liftIO $ putStrLn $ show x
   return ()
 
 cmd (Music go@GenericOptions{..} mo@MusicOptions{..})
