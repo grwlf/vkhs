@@ -186,7 +186,7 @@ cmd (Music go@GenericOptions{..} mo@MusicOptions{..})
   -- Query music files
   |not (null m_search_string) = do
     runAPI go $ do
-      API.Response _ (SizedList len ms) <- api "audio.search" [("q",m_search_string)]
+      API.Response _ (SizedList len ms) <- api "audio.search" [("q",m_search_string), ("count", "1000")]
       forM_ ms $ \m -> do
         io $ printf "%s\n" (mr_format m_output_format m)
       io $ printf "total %d\n" len
