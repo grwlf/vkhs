@@ -90,9 +90,9 @@ defaultSuperviser = go where
         alert $ "While filling form " ++ (printForm "" f)
         case o_allow_interactive of
           True -> do
-            v <- liftIO $ do
-              liftIO $ hPutStrLn stderr $ "Please, enter the correct value for input " ++ i ++ " : "
-              getLine
+            v <- do
+              alert $ "Please, enter the correct value for input " ++ i ++ " : "
+              liftIO $ getLine
             go (k v)
           False -> do
             alert $ "Unable to query value for " ++ i ++ " since interactive mode is disabled"

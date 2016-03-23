@@ -84,6 +84,7 @@ apiJ :: (MonadAPI (m (R m x)) (R m x) s)
     -> API m x JSON
 apiJ mname margs = do
   GenericOptions{..} <- gets toGenericOptions
+  APIState{..} <- gets toAPIState
   let protocol = (case o_use_https of
                     True -> "https"
                     False -> "http")
@@ -93,7 +94,7 @@ apiJ mname margs = do
           (URL_Host o_api_host)
           (Just (URL_Port (show o_port)))
           (URL_Path ("/method/" ++ mname))
-          (buildQuery (("access_token", l_access_token):margs)))
+          (buildQuery (("access_token", api_access_token):margs)))
 
   debug $ "> " ++ (show url)
 
