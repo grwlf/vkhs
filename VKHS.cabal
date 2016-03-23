@@ -1,6 +1,6 @@
 
 name:                VKHS
-version:             1.6.0
+version:             1.6.1
 synopsis:            Provides access to Vkontakte social network via public API
 description:
     Provides access to Vkontakte API methods. Library requires no interaction
@@ -9,7 +9,7 @@ description:
 license:             BSD3
 license-file:        LICENSE
 author:              Sergey Mironov
-maintainer:          ierton@gmail.com
+maintainer:          grrwlf@gmail.com
 copyright:           Copyright (c) 2012, Sergey Mironov
 category:            Web
 build-type:          Simple
@@ -26,7 +26,9 @@ library
                      Web.VKHS.Monad
                      Web.VKHS.Client
                      Web.VKHS.Login
+                     Web.VKHS.Error
                      Web.VKHS.API
+                     Web.VKHS.API.Types
 
   build-depends:     base >=4.6 && <5,
                      containers,
