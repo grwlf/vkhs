@@ -32,8 +32,19 @@ import Web.VKHS.API.Types as API
 
 import Util
 
+env_access_token = "VKQ_ACCESS_TOKEN"
+
+data APIOptions = APIOptions {
+    a_method :: String
+  , a_args :: String
+  } deriving(Show)
+
+data LoginOptions = LoginOptions {
+    l_eval :: Bool
+  } deriving(Show)
+
 data Options
-  = Login GenericOptions
+  = Login GenericOptions LoginOptions
   | API GenericOptions APIOptions
   | Music GenericOptions MusicOptions
   | UserQ GenericOptions UserOptions
@@ -61,7 +72,7 @@ opts m =
         <*> argument str (metavar "USER" <> help "User name or email")
         <*> argument str (metavar "PASS" <> help "User password")
         <*> strOption (short 'a' <> m <> metavar "ACCESS_TOKEN" <>
-              help "Access token. Honores VKQ_ACCESS_TOKEN environment variable")
+              help ("Access token. Honores " ++ env_access_token ++ " environment variable"))
 
       api_cmd = (info (API <$> genericOptions <*> (APIOptions
         <$> argument str (metavar "METHOD" <> help "Method name")
@@ -69,8 +80,10 @@ opts m =
         ( progDesc "Call VK API method" ))
 
   in subparser (
-       command "login" (info (Login <$> genericOptions)
-         ( progDesc "Login and print access token (also prints user_id and expiration time)" ))
+       command "login" (info (Login <$> genericOptions <*> (LoginOptions
+      <$> flag False True (long "eval" <> help "Print in shell-friendly format")
+      ))
+      ( progDesc "Login and print access token" ))
     <> command "call" api_cmd
     <> command "api" api_cmd
     <> command "music" (info ( Music <$> genericOptions <*> (MusicOptions
@@ -120,7 +133,7 @@ opts m =
 
 main :: IO ()
 main = ( do
-  m <- maybe (value "") (value) <$> lookupEnv "VKQ_ACCESS_TOKEN"
+  m <- maybe (value "") (value) <$> lookupEnv env_access_token
   o <- execParser (info (helper <*> opts m) (fullDesc <> header "VKontakte social network tool"))
   r <- runEitherT (cmd o)
   case r of
@@ -146,9 +159,11 @@ main = ( do
 cmd :: Options -> EitherT String IO ()
 
 -- Login
-cmd (Login lo) = do
-  AccessToken{..} <- runLogin lo
-  liftIO $ putStrLn at_access_token
+cmd (Login go LoginOptions{..}) = do
+  AccessToken{..} <- runLogin go
+  case l_eval of
+    True -> liftIO $ putStrLn $ printf "export %s=%s\n" env_access_token at_access_token
+    False -> liftIO $ putStrLn at_access_token
 
 -- API
 cmd (API go APIOptions{..}) = do

@@ -135,12 +135,6 @@ data Verbosity = Normal | Trace | Debug
   deriving(Enum,Eq,Ord,Show)
 
 
--- FIXME: move to app-specific folder
-data APIOptions = APIOptions {
-    a_method :: String
-  , a_args :: String
-  } deriving(Show)
-
 data MusicOptions = MusicOptions {
     m_list_music :: Bool
   , m_search_string :: String
