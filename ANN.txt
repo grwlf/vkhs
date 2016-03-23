@@ -1,0 +1,3 @@
+Hi, Cafe!
+
+A new version of VKHS library and console application is ready. The package provides access to Vkontakte social network API, popular mainly in Russia.
