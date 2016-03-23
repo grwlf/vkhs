@@ -1,0 +1,6 @@
+[submodule "lib/uri-bytestring"]
+	path = lib/uri-bytestring
+	url = https://github.com/Soostone/uri-bytestring
+[submodule "lib/cookie"]
+	path = lib/cookie
+	url = https://github.com/snoyberg/cookie

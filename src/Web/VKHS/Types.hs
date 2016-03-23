@@ -1,14 +1,31 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 module Web.VKHS.Types where
+
+import Data.List
+import Data.Char
+
+import Data.Aeson (FromJSON(..), ToJSON(..), (.=), (.:))
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Types as Aeson
+
+import qualified Network.Shpider.Forms as Shpider
 
 -- | AccessToken is a authentication data, required by all VK API
 -- functions. It is a tuple of access_token, user_id, expires_in fields,
 -- returned by login procedure.
--- 
+--
 -- See http://vk.com/developers.php?oid=-1&p=Авторизация_клиентских_приложений
 -- (in Russian) for more details
-type AccessToken = (String,String,String)
+data AccessToken = AccessToken {
+    at_access_token :: String
+  , at_user_id :: String
+  , at_expires_in :: String
+  } deriving(Show, Eq, Ord)
 
 -- | Access rigth to request from VK.
+-- See API docs http://vk.com/developers.php?oid=-1&p=Права_доступа_приложений (in
+-- Russian) for details
 data AccessRight
   = Notify  -- Пользователь разрешил отправлять ему уведомления.
   | Friends -- Доступ к друзьям.
@@ -28,12 +45,16 @@ data AccessRight
   | Notifications   -- Доступ к оповещениям об ответах пользователю.
   | Stats   -- Доступ к статистике групп и приложений пользователя, администратором которых он является.
   | Ads     -- Доступ к расширенным методам работы с рекламным API.
-  | Offline -- Доступ к API в любое время со стороннего сервера. 
-  deriving(Show)
+  | Offline -- Доступ к API в любое время со стороннего сервера.
+  deriving(Show, Eq, Ord, Enum)
+
+toUrlArg :: [AccessRight] -> String
+toUrlArg = intercalate "," . map (map toLower . show)
+
 
 allAccess :: [AccessRight]
 allAccess =
-  [ 
+  [
   --   Notify
     Friends
   , Photos
@@ -54,48 +75,86 @@ allAccess =
   -- , Offline
   ]
 
--- See API docs http://vk.com/developers.php?oid=-1&p=Права_доступа_приложений (in
--- Russian) for details
+newtype AppID = AppID { aid_string :: String }
+  deriving(Show, Eq, Ord)
 
--- | Verbosity level. Debug will dump *html and output curl log
+
+data JSON = JSON { js_aeson :: Aeson.Value }
+  deriving(Show)
+
+data Form = Form {
+    form_title :: String
+  , form :: Shpider.Form
+  } deriving(Show)
+
+data FilledForm = FilledForm {
+    fform_title :: String
+  , fform :: Shpider.Form
+  } deriving(Show)
+
+
+data GenericOptions = GenericOptions {
+    o_login_host :: String
+  , o_api_host :: String
+  , o_port :: Int
+  , o_verbose :: Bool
+  , o_use_https :: Bool
+  , o_max_request_rate_per_sec :: Rational
+  -- ^ How many requests per second is allowed
+  , o_allow_interactive :: Bool
+
+  , l_appid :: AppID
+  , l_username :: String
+  -- ^ Empty string means no value is given
+  , l_password :: String
+  -- ^ Empty string means no value is given
+  , l_access_token :: String
+  } deriving(Show)
+
+defaultOptions = GenericOptions {
+    o_login_host = "oauth.vk.com"
+  , o_api_host = "api.vk.com"
+  , o_port = 443
+  , o_verbose = False
+  , o_use_https = True
+  , o_max_request_rate_per_sec = 3
+  , o_allow_interactive = True
+
+  , l_appid  = AppID "3128877"
+  , l_username = ""
+  -- ^ Empty string means no value is given
+  , l_password = ""
+  -- ^ Empty string means no value is given
+  , l_access_token = ""
+  }
+
+class ToGenericOptions s where
+  toGenericOptions :: s -> GenericOptions
+
 data Verbosity = Normal | Trace | Debug
   deriving(Enum,Eq,Ord,Show)
 
-type ClientId = String
 
-data LoginEnv = LoginEnv
-  { formdata :: [(String,String)]
-  -- ^ Dictionary containig forms input/value
-  , ac_rights :: [AccessRight]
-  -- ^ Access rights, required by later API calls
-  , clientId :: ClientId
-  -- ^ Application ID provided by vk.com
+data MusicOptions = MusicOptions {
+    m_list_music :: Bool
+  , m_search_string :: String
+  , m_name_format :: String
+  , m_output_format :: String
+  , m_out_dir :: Maybe String
+  , m_records_id :: [String]
+  , m_skip_existing :: Bool
   } deriving(Show)
 
-data CallEnv = CallEnv
-  { access_token :: String
-  -- ^ Access token, the result of login operation
+data UserOptions = UserOptions {
+    u_queryString :: String
   } deriving(Show)
 
--- | VKHS environment
-data Env subenv = Env
-  { sub :: subenv
-  , verbose :: Verbosity
-  -- ^ Verbosity level
-  , useragent :: String
-  -- ^ User agent identifier, defaults to Mozilla Firefox
-  , delay_ms :: Int
-  -- ^ Delay after each transaction, in milliseconds. Library uses it for
-  -- preventing application from being banned for flooding.
-  } deriving (Show)
+data WallOptions = WallOptions {
+    w_woid :: String
+  } deriving(Show)
 
-mkEnv :: s -> Env s
-mkEnv x = Env
-  x
-  Normal
-  "Mozilla/5.0 (X11; Linux x86_64; rv:12.0) Gecko/20120702 Firefox/12.0"
-  500
-
-callEnv :: Env a -> String -> Env CallEnv
-callEnv (Env _ a b c) at = Env (CallEnv at) a b c
+data GroupOptions = GroupOptions {
+    g_search_string :: String
+  , g_output_format :: String
+  } deriving(Show)
 

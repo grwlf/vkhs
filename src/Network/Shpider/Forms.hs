@@ -1,4 +1,5 @@
 {-
+ -
  - Copyright (c) 2009-2010 Johnny Morrice
  -
  - Permission is hereby granted, free of charge, to any person
@@ -21,26 +22,40 @@
  - CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  - SOFTWARE.
  -
- -}
+-}
 module Network.Shpider.Forms 
-   (
-   Form (..)
+   ( module Network.Shpider.Pairs 
+   , Form (..)
    , Method (..)
    , gatherForms
    , fillOutForm
    , allForms
    , toForm
    , mkForm
+   , gatherTitle
+   , emptyInputs
    )
    where
 
 import Data.Maybe
-import Data.Char
-import Control.Arrow ( first )
+
+
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+
+import Data.String.UTF8 as U (UTF8(..))
+import qualified Data.String.UTF8 as U
+
 import qualified Data.Map as M
+
 import Text.HTML.TagSoup.Parsec
 
-data Method = GET | POST
+import Network.Shpider.TextUtils
+import Network.Shpider.Pairs
+
+-- | Either GET or POST.
+data Method =
+   GET | POST
    deriving Show
 
 -- | Plain old form: Method, action and inputs.
@@ -50,6 +65,9 @@ data Form =
         , inputs :: M.Map String String
         }
    deriving Show
+
+emptyInputs :: Form -> [String]
+emptyInputs = fst . unzip . filter ( not . null . snd )  . M.toList . inputs
 
 -- | Takes a form and fills out the inputs with the given [ ( String , String ) ].
 -- It is convienent to use the `pairs` syntax here.
@@ -61,7 +79,10 @@ data Form =
 --    \"message\" =: \"Nice syntax dewd.\"
 -- @
 fillOutForm :: Form -> [ ( String , String ) ] -> Form
-fillOutForm = foldl ( \f (n,v) -> f { inputs = M.insert n v $ inputs f } )
+fillOutForm f is =
+   foldl ( \ form ( n , v ) -> form { inputs = M.insert n v $ inputs form } )
+         f
+         is
 
 -- | The first argument is the action attribute of the form, the second is the method attribute, and the third are the inputs.
 mkForm :: String -> Method -> [ ( String , String ) ] -> Form
@@ -76,21 +97,25 @@ gatherForms :: [ Tag String ] -> [ Form ]
 gatherForms =
    tParse allForms
 
+gatherTitle :: [Tag String] -> String
+gatherTitle ts = case tParse allTitles ts of { [] -> "" ; x:_ -> x }
+
+allTitles :: TagParser String [String]
+allTitles = do
+   fs <- allWholeTags "title"
+   return $ mapMaybe (
+    \(TagOpen "title" _ , innerTags , _ ) ->
+      return $ concat $ map (\t -> case t of
+        TagText t -> t
+        _ -> []
+        ) innerTags
+    ) fs
+
 -- | The `TagParser` which parses all forms.
 allForms :: TagParser String [ Form ]
 allForms = do
    fs <- allWholeTags "form"
    return $ mapMaybe toForm fs
-
--- | A case insensitive lookup for html attributes.
-attrLookup :: String -> [ ( String , String ) ] -> Maybe String
-attrLookup attr =
-   lookup ( map toLower attr ) . map ( first (map toLower) )
-
--- | Turns a String lowercase.  <rant>In my humble opinion, and considering that a few different packages implement this meager code, this should be in the prelude.</rant>
-lowercase :: String -> String 
-lowercase = map toLower
-
 
 toForm :: WholeTag String -> Maybe Form
 toForm ( TagOpen _ attrs , innerTags , _ ) = do

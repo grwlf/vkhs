@@ -1,85 +1,120 @@
-{- |
-Module      :  Web.VKHS
-Copyright   :  (c) Sergey Mironov <ierton@gmail.com> 2012
-License     :  BSD-style (see the file LICENSE)
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+module Web.VKHS where
 
-Maintainer  :  ierton@gmail.com
-Stability   :  experimental
-Portability :  non-portable (multi-parameter type classes)
+import Data.List
+import Data.Maybe
+import Data.Time
+import Data.Either
+import Control.Applicative
+import Control.Monad
+import Control.Monad.State (MonadState, execState, evalStateT, StateT(..), get, modify)
+import Control.Monad.Cont
+import Control.Monad.Reader
+import Control.Monad.Trans.Either
 
-[@VKHS@]
+import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as BS
 
-VKHS is written in Haskell and provides access to Vkontakte <http://vk.com>
-social network, popular mainly in Russia. Library can be used to login into the
-network as a standalone application (OAuth implicit flow as they call it).
-Interaction with user is not required. For now, vkhs offers limited error
-detection and no captcha support.
+import System.IO
 
-Following example illustrates basic usage (please fill client_id, email and
-password with correct values):
-
->   import Web.VKHS.Login
->   import Web.VKHS.API
->
->   main = do
->       let client_id = "111111"
->       let e = env client_id "user@example.com" "password" [Photos,Audio,Groups]
->       (Right at) <- login e
->
->       let user_of_interest = "222222"
->       (Right ans) <- api e at "users.get" [
->             ("uids",user_of_interest)
->           , ("fields","first_name,last_name,nickname,screen_name")
->           , ("name_case","nom")
->           ]
->       putStrLn ans
-
-client_id is an application identifier, provided by vk.com. Users receive it
-after registering their applications after SMS confirmation. Registration form is 
-located here <http://vk.com/editapp?act=create>.
-
-Internally, library uses small curl-based HTTP automata and tagsoup for jumping
-over relocations and submitting various \'Yes I agree\' forms. Curl .so library is
-required for vkhs to work. I am using curl-7.26.0 on my system.
-
-[@Debugging@]
-
-To authenticate the user, vkhs acts like a browser: it analyzes html but fills
-all forms by itself instead of displaying pages. Of cause, would vk.com change
-html design, things stop working.
-
-To deal with that potential problem, I\'ve included some debugging facilities:
-changing:
-
-writing
-
->       (Right at) <- login e { verbose = Debug }
-
-will trigger curl output plus html dumping to the current directory. Please,
-mail those .html to me if problem appears.
-
-[@Limitations@]
-
-    * Ignores \'Invalid password\' answers
-
-    * Captchas are treated as errors
-
-    * Implicit-flow authentication, see documentation in
-      Russian <http://vk.com/developers.php>
-      for details
-
-    * Probably, low speed due to restarting curl session on every request. But
-      anyway, vk.com limits request rate to 3 per second.
-
--}
-
-module Web.VKHS
-    ( module Web.VKHS.Login
-    , module Web.VKHS.Types
-    , module Web.VKHS.API
-    ) where
-
+import Web.VKHS.Error
 import Web.VKHS.Types
-import Web.VKHS.Login
-import Web.VKHS.API
+import Web.VKHS.Client as Client
+import Web.VKHS.Monad
+import Web.VKHS.Login (MonadLogin, LoginState(..), ToLoginState(..), printForm, login)
+import qualified Web.VKHS.Login as Login
+import Web.VKHS.API (MonadAPI, APIState(..), ToAPIState(..), api)
+import qualified Web.VKHS.API as API
+
+import Debug.Trace
+
+{- Test -}
+
+data State = State {
+    cs :: ClientState
+  , ls :: LoginState
+  , as :: APIState
+  , go :: GenericOptions
+  }
+
+instance ToLoginState State where
+  toLoginState = ls
+  modifyLoginState f = \s -> s { ls = f (ls s) }
+instance ToClientState State where
+  toClientState = cs
+  modifyClientState f = \s -> s { cs = f (cs s) }
+instance API.ToAPIState State where
+  toAPIState = as
+  modifyAPIState f = \s -> s { as = f (as s) }
+instance ToGenericOptions State where
+  toGenericOptions = go
+
+initialState :: GenericOptions -> EitherT String IO State
+initialState go = State
+  <$> lift (Client.defaultState go)
+  <*> pure (Login.defaultState go)
+  <*> pure (API.defaultState)
+  <*> pure go
+
+
+newtype VK r a = VK { unVK :: Guts VK (StateT State (EitherT String IO)) r a }
+  deriving(MonadIO, Functor, Applicative, Monad, MonadState State, MonadReader (r -> VK r r) , MonadCont)
+
+instance MonadClient (VK r) State
+instance MonadVK (VK r) r
+instance MonadLogin (VK r) r State
+instance API.MonadAPI (VK r) r State
+
+type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
+
+runVK :: VK r r -> StateT State (EitherT String IO) r
+runVK m = runContT (runReaderT (unVK (catch m)) undefined) return
+
+defaultSuperviser :: (Show a) => VK (R VK a) (R VK a) -> StateT State (EitherT String IO) a
+defaultSuperviser = go where
+  go m = do
+    GenericOptions{..} <- toGenericOptions <$> get
+    res <- runVK m
+    res_desc <- pure (describeResult res)
+    case res of
+      Fine a -> return a
+      UnexpectedInt e k -> do
+        alert "UnexpectedInt (ignoring)"
+        go (k 0)
+      UnexpectedFormField (Form tit f) i k -> do
+        alert $ "While filling form " ++ (printForm "" f)
+        case o_allow_interactive of
+          True -> do
+            v <- do
+              alert $ "Please, enter the correct value for input " ++ i ++ " : "
+              liftIO $ getLine
+            go (k v)
+          False -> do
+            alert $ "Unable to query value for " ++ i ++ " since interactive mode is disabled"
+            lift $ left res_desc
+      _ -> do
+        alert $ "Unsupervised error: " ++ res_desc
+        lift $ left res_desc
+
+runLogin go = do
+  s <- initialState go
+  evalStateT (defaultSuperviser (login >>= return . Fine)) s
+
+
+runAPI go@GenericOptions{..} m = do
+  s <- initialState go
+  flip evalStateT s $ do
+  case (null l_access_token) of
+    True -> do
+      AccessToken{..} <- defaultSuperviser (login >>= return . Fine)
+      modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
+    False -> do
+      modify $ modifyAPIState (\as -> as{api_access_token = l_access_token})
+  defaultSuperviser (m >>= return . Fine)
+
 
