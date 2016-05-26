@@ -39,6 +39,7 @@ class (MonadCont m, MonadReader (r -> m r) m) => MonadVK m r
 
 -- instance (Monad m) => MonadVK (VKT m r) r
 
+-- | Store early exit handler in the reader monad, run the computation @m@
 catch :: (MonadVK m r) => m r -> m r
 catch m = do
   callCC $ \k -> do

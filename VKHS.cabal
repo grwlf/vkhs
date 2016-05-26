@@ -29,6 +29,8 @@ library
                      Web.VKHS.Error
                      Web.VKHS.API
                      Web.VKHS.API.Types
+                     Web.VKHS.API.Base
+                     Web.VKHS.API.Simple
 
   build-depends:     base >=4.6 && <5,
                      containers,

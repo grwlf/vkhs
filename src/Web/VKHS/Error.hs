@@ -10,13 +10,23 @@ import Data.ByteString.Char8 (ByteString, unpack)
 data Error = ETimeout | EClient Client.Error
   deriving(Show, Eq)
 
+-- | Alias for Result
 type R t a = Result t a
 
+-- | Result with continuation. @t@ represents the continuation monad, which
+-- needs to track two types: the 'early break' type and the 'current result'
+-- type. In the end both types are the same.
 data Result t a =
     Fine a
+  -- ^ The normal exit of a computation
   | UnexpectedInt Error (Int -> t (R t a) (R t a))
+  -- ^ Invalid integer value. It is possible for client to set a correct URL and
+  -- continue
   | UnexpectedBool Error (Bool -> t (R t a) (R t a))
+  -- ^ Invalid boolean value. It is possible for client to set a correct URL and
+  -- continue
   | UnexpectedURL Client.Error (URL -> t (R t a) (R t a))
+  -- ^ Invalid URL. It is possible for client to set a correct URL and continue
   | UnexpectedRequest Client.Error (Request -> t (R t a) (R t a))
   | UnexpectedResponse Client.Error (Response -> t (R t a) (R t a))
   | UnexpectedFormField Form String (String -> t (R t a) (R t a))

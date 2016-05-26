@@ -28,7 +28,6 @@ import Web.VKHS.Types
 import Web.VKHS.Client as Client
 import Web.VKHS.Monad hiding (catch)
 import Web.VKHS.API as API
-import Web.VKHS.API.Types as API
 
 import Util
 
@@ -133,7 +132,7 @@ opts m =
       <*> strOption
         ( metavar "FORMAT"
         <> short 'F'
-        <> value "%o_%i %U\t%t"
+        <> value "%i %m %n %u"
         <> help ("Output format, supported tags:" ++ (listTags gr_tags))
         )
       ))
@@ -242,12 +241,7 @@ cmd (GroupQ go (GroupOptions{..}))
 
     runAPI go $ do
 
-      API.Response _ (Many cnt (grs :: [GroupRecord])) <-
-        api "groups.search"
-          [("q",g_search_string),
-           ("v","5.44"),
-           ("fields", "can_post,members_count"),
-           ("count", "1000")]
+      (Sized cnt grs) <- runGroupSearch g_search_string
 
       forM_ grs $ \gr -> do
         liftIO $ printf "%s\n" (gr_format g_output_format gr)

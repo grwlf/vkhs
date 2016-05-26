@@ -1,6 +1,8 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Web.VKHS.API.Types where
@@ -18,6 +20,9 @@ import Data.Vector as Vector (head, tail)
 import Data.Text
 
 import Text.Printf
+
+import Web.VKHS.Error
+import Web.VKHS.API.Base
 
 -- See http://vk.com/developers.php?oid=-1&p=Авторизация_клиентских_приложений
 -- (in Russian) for more details
@@ -94,14 +99,14 @@ publishedAt wr = posixSecondsToUTCTime $ fromIntegral $ wr_wdate wr
  - API version 5.44
  -}
 
-data Many a = Many {
+data Sized a = Sized {
     m_count :: Int
   , m_items :: a
-  } deriving (Show)
+  } deriving (Show, Functor)
 
-instance FromJSON a => FromJSON (Many a) where
+instance FromJSON a => FromJSON (Sized a) where
   parseJSON = Aeson.withObject "Result" (\o ->
-    Many <$> o .: "count" <*> o .: "items")
+    Sized <$> o .: "count" <*> o .: "items")
 
 
 data Deact = Banned | Deleted | OtherDeact Text
@@ -169,7 +174,6 @@ instance FromJSON GroupRecord where
       <*> (o .: "photo_200")
       <*> (fmap (==(1::Int)) <$> (o .:? "can_post"))
       <*> (o .:? "members_count")
-
 
 groupURL :: GroupRecord -> String
 groupURL GroupRecord{..} = "https://vk.com/" ++ urlify gr_type ++ (show gr_id) where

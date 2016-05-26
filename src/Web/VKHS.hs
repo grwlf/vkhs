@@ -62,16 +62,21 @@ initialState go = State
   <*> pure go
 
 
+-- Intermediate alias
+type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
+
+-- | Main VK monad able to track errors, track full state @State@, set
+-- early exit by the means of continuation monad. See @runVK@
 newtype VK r a = VK { unVK :: Guts VK (StateT State (EitherT String IO)) r a }
   deriving(MonadIO, Functor, Applicative, Monad, MonadState State, MonadReader (r -> VK r r) , MonadCont)
 
 instance MonadClient (VK r) State
 instance MonadVK (VK r) r
 instance MonadLogin (VK r) r State
-instance API.MonadAPI (VK r) r State
+-- instance MonadAPI (VK r) r State
+instance MonadAPI VK r State
 
-type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
-
+-- | Run the VK script, return final state and error status
 runVK :: VK r r -> StateT State (EitherT String IO) r
 runVK m = runContT (runReaderT (unVK (catch m)) undefined) return
 
