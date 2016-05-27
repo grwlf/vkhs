@@ -19,6 +19,12 @@ homepage:            http://github.com/grwlf/vkhs
 library
   hs-source-dirs:    src
   other-modules:
+                     Network.Shpider.Forms
+                     Network.Shpider.Pairs
+                     Network.Shpider.TextUtils
+                     Text.HTML.TagSoup.Parsec
+                     Text.Namefilter
+                     Text.PFormat
 
   exposed-modules:
                      Web.VKHS
