@@ -67,6 +67,8 @@ library
 executable vkq
   hs-source-dirs:    app/vkq, app/aux, src
   main-is:           Main.hs
+  other-modules:
+                     Util
   build-depends:     regexpr,
                      text
 
