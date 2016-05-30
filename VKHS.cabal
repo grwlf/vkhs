@@ -65,7 +65,7 @@ library
 
 
 executable vkq
-  hs-source-dirs:    app/vkq, app/aux, src
+  hs-source-dirs:    app/vkq, app/common, src
   main-is:           Main.hs
   other-modules:
                      Util
