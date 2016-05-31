@@ -182,3 +182,30 @@ groupURL GroupRecord{..} = "https://vk.com/" ++ urlify gr_type ++ (show gr_id) w
   urlify Public = "page"
 
 
+data Country = Country {
+    co_int :: Integer
+  , co_title :: Text
+} deriving(Show)
+
+instance FromJSON Country where
+  parseJSON = Aeson.withObject "Country" $ \o ->
+    Country
+      <$> (o .: "id")
+      <*> (o .: "title")
+
+
+data City = City {
+    c_city_id :: Integer
+  , c_title :: Text
+  , c_maybe_area :: Maybe Text
+  , c_maybe_region :: Maybe Text
+} deriving(Show)
+
+instance FromJSON City where
+  parseJSON = Aeson.withObject "City" $ \o ->
+    City
+      <$> (o .: "id")
+      <*> (o .: "title")
+      <*> (o .:? "area")
+      <*> (o .:? "region")
+

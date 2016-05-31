@@ -12,7 +12,7 @@ import Data.Maybe
 import Data.Time
 import Data.Either
 import Control.Applicative
-import Control.Arrow ((***))
+import Control.Arrow ((&&&),(***))
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Cont
@@ -21,6 +21,7 @@ import qualified Data.CaseInsensitive as CI
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.List.Split
+import Data.Text(Text)
 
 import Control.Concurrent (threadDelay)
 
@@ -117,6 +118,7 @@ newtype URL_Path = URL_Path { urlpath :: String }
 newtype URL = URL { uri :: Client.URI }
   deriving(Show, Eq)
 
+-- FIXME: Pack Text to ByteStrings, not to String
 buildQuery :: [(String,String)] -> URL_Query
 buildQuery qis = URL_Query ("?" ++ intercalate "&" (map (\(a,b) -> (esc a) ++ "=" ++ (esc b)) qis)) where
   esc x = Client.escapeURIString Client.isAllowedInURI x
@@ -131,6 +133,7 @@ urlFromString s =
     Nothing -> Left (ErrorParseURL s "Client.parseURI failed")
     Just u -> Right (URL u)
 
+-- | FIXME: Convert to BS
 splitFragments :: String -> String -> String -> [(String,String)]
 splitFragments sep eqs =
     filter (\(a, b) -> not (null a))
@@ -145,6 +148,7 @@ splitFragments sep eqs =
         trim = rev (dropWhile (`elem` (" \t\n\r" :: String)))
           where rev f = reverse . f . reverse . f
 
+-- | FIXME: Convert to BS
 urlFragments :: URL -> [(String,String)]
 urlFragments URL{..} = splitFragments "&" "=" $  unsharp $ Client.uriFragment uri where
   unsharp ('#':x) = x

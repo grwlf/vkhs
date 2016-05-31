@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 module Web.VKHS.Types where
@@ -5,11 +6,24 @@ module Web.VKHS.Types where
 import Data.List
 import Data.Char
 
+import Data.Text(Text)
+import qualified Data.Text as Text
+
+import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as ByteString
+
 import Data.Aeson (FromJSON(..), ToJSON(..), (.=), (.:))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 
 import qualified Network.Shpider.Forms as Shpider
+
+
+bunpack = ByteString.unpack
+tpack = Text.pack
+tunpack = Text.unpack
+tshow :: (Show a) => a -> Text
+tshow = tpack . show
 
 -- | AccessToken is a authentication data, required by all VK API
 -- functions. It is a tuple of access_token, user_id, expires_in fields,

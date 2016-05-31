@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -11,12 +12,16 @@ import Data.List
 import Data.Maybe
 import Data.Time
 import Data.Either
+import Control.Arrow ((***),(&&&))
 import Control.Category ((>>>))
 import Control.Applicative
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Writer
 import Control.Monad.Cont
+
+import Data.Text(Text)
+import qualified Data.Text as Text
 
 import Data.ByteString.Char8 (ByteString)
 import Data.ByteString.Lazy (fromStrict)
@@ -40,7 +45,7 @@ data APIState = APIState {
   } deriving (Show)
 
 defaultState = APIState {
-    api_access_token = []
+    api_access_token = ""
   }
 
 class ToGenericOptions s => ToAPIState s where
@@ -67,13 +72,16 @@ parseJSON bs = do
 --
 -- See documentation:
 -- <http://vk.com/developers.php?oid=-1&p=%D0%9E%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5_%D0%BC%D0%B5%D1%82%D0%BE%D0%B4%D0%BE%D0%B2_API>
+--
+-- FIXME: We currentyl use Text.unpack to encode text into strings. Use encodeUtf8
+-- instead.
 apiJ :: (MonadAPI m x s)
     => String
     -- ^ API method name
-    -> [(String, String)]
+    -> [(String, Text)]
     -- ^ API method arguments
     -> API m x JSON
-apiJ mname margs = do
+apiJ mname (map (id *** tunpack) -> margs) = do
   GenericOptions{..} <- gets toGenericOptions
   APIState{..} <- gets toAPIState
   let protocol = (case o_use_https of
@@ -99,7 +107,7 @@ apiJ mname margs = do
 api :: (Aeson.FromJSON a, MonadAPI m x s)
     => String
     -- ^ API method name
-    -> [(String, String)]
+    -> [(String, Text)]
     -- ^ API method arguments
     -> API m x a
 api m args = do
@@ -108,3 +116,8 @@ api m args = do
     Right a -> return a
     Left e -> terminate (JSONParseFailure' j e)
 
+
+-- | String version of @api@
+api_S :: (Aeson.FromJSON a, MonadAPI m x s)
+    => String -> [(String, String)] -> API m x a
+api_S m args = api m (map (id *** tpack) args)

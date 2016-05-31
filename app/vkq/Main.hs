@@ -8,6 +8,7 @@ import Control.Exception (SomeException(..),catch,bracket)
 import Control.Monad
 import Control.Monad.Trans
 import Control.Monad.Trans.Either
+import Control.Arrow ((***))
 import Data.Maybe
 import Data.List
 import Data.Char
@@ -33,6 +34,11 @@ import Util
 
 env_access_token = "VKQ_ACCESS_TOKEN"
 
+data DBOptions = DBOptions {
+    db_countries :: Bool
+  , db_cities :: Bool
+  } deriving(Show)
+
 data APIOptions = APIOptions {
     a_method :: String
   , a_args :: String
@@ -49,6 +55,7 @@ data Options
   | UserQ GenericOptions UserOptions
   | WallQ GenericOptions WallOptions
   | GroupQ GenericOptions GroupOptions
+  | DBQ GenericOptions DBOptions
   deriving(Show)
 
 toMaybe :: (Functor f) => f String -> f (Maybe String)
@@ -64,7 +71,7 @@ opts m =
         <*> (pure $ o_port defaultOptions)
         <*> flag False True (long "verbose" <> help "Be verbose")
         <*> (pure $ o_use_https defaultOptions)
-        <*> fmap read (strOption (value (show $ o_max_request_rate_per_sec defaultOptions) <> long "req-per-sec" <> metavar "N" <> help "Max number of requests per second"))
+        <*> fmap (read . tunpack) (tpack <$> strOption (value (show $ o_max_request_rate_per_sec defaultOptions) <> long "req-per-sec" <> metavar "N" <> help "Max number of requests per second"))
         <*> flag True False (long "interactive" <> help "Allow interactive queries")
 
         <*> (AppID <$> strOption (long "appid" <> metavar "APPID" <> value "3128877" <> help "Application ID, defaults to VKHS" ))
@@ -137,6 +144,12 @@ opts m =
         )
       ))
       ( progDesc "Extract groups information"))
+
+    <> command "db" (info ( DBQ <$> genericOptions <*> (DBOptions
+      <$> flag False True (long "list-countries" <> help "List known countries")
+      <*> flag False True (long "list-cities" <> help "List known cities")
+      ))
+      ( progDesc "Extract generic DB information"))
     )
 
 main :: IO ()
@@ -176,7 +189,7 @@ cmd (Login go LoginOptions{..}) = do
 -- API
 cmd (API go APIOptions{..}) = do
   runAPI go $ do
-    x <- apiJ a_method (splitFragments "," "=" a_args)
+    x <- apiJ a_method (map (id *** tpack) $ splitFragments "," "=" a_args)
     liftIO $ putStrLn $ show x
   return ()
 
@@ -185,7 +198,7 @@ cmd (Music go@GenericOptions{..} mo@MusicOptions{..})
   -- Query music files
   |not (null m_search_string) = do
     runAPI go $ do
-      API.Response _ (SizedList len ms) <- api "audio.search" [("q",m_search_string), ("count", "1000")]
+      API.Response _ (SizedList len ms) <- api_S "audio.search" [("q",m_search_string), ("count", "1000")]
       forM_ ms $ \m -> do
         io $ printf "%s\n" (mr_format m_output_format m)
       io $ printf "total %d\n" len
@@ -193,7 +206,7 @@ cmd (Music go@GenericOptions{..} mo@MusicOptions{..})
   -- List music files
   |m_list_music = do
     runAPI go $ do
-      (API.Response _ (ms :: [MusicRecord])) <- api "audio.get" [("q",m_search_string)]
+      (API.Response _ (ms :: [MusicRecord])) <- api_S "audio.get" [("q",m_search_string)]
       forM_ ms $ \m -> do
         io $ printf "%s\n" (mr_format m_output_format m)
 
@@ -201,7 +214,7 @@ cmd (Music go@GenericOptions{..} mo@MusicOptions{..})
   |not (null m_records_id) = do
     let out_dir = fromMaybe "." m_out_dir
     runAPI go $ do
-      (API.Response _ (ms :: [MusicRecord])) <- api "audio.getById" [("audios", concat $ intersperse "," m_records_id)]
+      (API.Response _ (ms :: [MusicRecord])) <- api_S "audio.getById" [("audios", concat $ intersperse "," m_records_id)]
       forM_ ms $ \mr@MusicRecord{..} -> do
         (f, mh) <- liftIO $ openFileMR mo mr
         case mh of
@@ -241,8 +254,22 @@ cmd (GroupQ go (GroupOptions{..}))
 
     runAPI go $ do
 
-      (Sized cnt grs) <- runGroupSearch g_search_string
+      (Sized cnt grs) <- groupSearch (tpack g_search_string)
 
       forM_ grs $ \gr -> do
         liftIO $ printf "%s\n" (gr_format g_output_format gr)
+
+cmd (DBQ go (DBOptions{..}))
+
+  |db_countries = do
+
+    runAPI go $ do
+
+      (Sized cnt cs) <- getCountries
+
+      forM_ cs $ \Country{..} -> do
+        liftIO $ Text.putStrLn $ Text.concat [ tshow co_int, "\t",  co_title]
+
+  |db_cities = do
+    error "not implemented"
 

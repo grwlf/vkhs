@@ -160,9 +160,10 @@ analyzeResponse (res, jar) = do
     Just url -> do
       debug $ "< 0 Fragments: " ++ show (urlFragments url)
       maybe (return $ Left $ DoGET url jar) (\x -> return $ Right x) $ do
-        at_access_token <- lookup "access_token" (urlFragments url)
-        at_user_id <-  lookup "user_id" (urlFragments url)
-        at_expires_in <-  lookup "expires_in" (urlFragments url)
+        let frg = (urlFragments url)
+        at_access_token <- lookup "access_token" frg
+        at_user_id <-  lookup "user_id" frg
+        at_expires_in <-  lookup "expires_in" frg
         return AccessToken{..}
     Nothing -> do
       case forms of

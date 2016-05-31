@@ -10,6 +10,8 @@ import Data.List
 import Data.Maybe
 import Data.Time
 import Data.Either
+import Data.Text(Text)
+import qualified Data.Text as Text
 import Control.Applicative
 import Control.Monad
 import Control.Monad.State (MonadState, execState, evalStateT, StateT(..), get, modify)
