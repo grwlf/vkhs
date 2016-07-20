@@ -12,6 +12,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import Control.Monad
 import Control.Monad.Trans
+import Control.Exception
 import System.Environment
 import System.FilePath
 import System.Exit
@@ -19,6 +20,8 @@ import System.Directory
 import System.IO
 import Text.RegexPR
 import Text.Printf
+import Debug.Trace
+import Data.Monoid
 
 import Web.VKHS.Types
 import Web.VKHS.API.Types
@@ -51,8 +54,10 @@ gr_tags = [
 gr_format :: String -> GroupRecord -> String
 gr_format s mr = pformat '%' gr_tags s mr
 
+mr_full_id MusicRecord{..} = show mr_owner_id <> "_" <> show mr_id
+
 mr_tags = [
-    ('i', show . mr_id)
+    ('i', mr_full_id)
   , ('o', show . mr_owner_id)
   , ('a', namefilter . mr_artist)
   , ('t', namefilter . mr_title)
@@ -86,6 +91,7 @@ namefilter :: String -> String
 namefilter = trim_space . one_space . normal_letters . no_html . html_amp
 
 
+
 -- Open file. Return filename and handle. Don't open file if it exists
 openFileMR :: MusicOptions -> MusicRecord -> IO (FilePath, Maybe Handle)
 openFileMR mo@MusicOptions{..} mr@MusicRecord{..} =
@@ -105,8 +111,12 @@ openFileMR mo@MusicOptions{..} mr@MusicRecord{..} =
         True -> do
           return (fp,Nothing)
         False -> do
-          h <- openBinaryFile fp WriteMode
-          return (fp,Just h)
+          handle (\(_::SomeException) -> do
+              hPutStrLn stderr ("Failed to open file " <> fp)
+              return (fp, Nothing)
+            ) $ do
+            h <- openBinaryFile fp WriteMode
+            return (fp,Just h)
 
 io :: (MonadIO m) => IO a -> m a
 io = liftIO

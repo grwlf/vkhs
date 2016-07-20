@@ -109,13 +109,13 @@ opts m =
       <*> strOption
         ( metavar "FORMAT"
         <> short 'f'
-        <> value "%o_%i %U\t%t"
+        <> value "%i %U\t%t"
         <> help "Listing format, supported tags: %i %o %a %t %d %u"
         )
       <*> strOption
         ( metavar "FORMAT"
         <> short 'F'
-        <> value "%o_%i %U\t%t"
+        <> value "%i_%a_%t"
         <> help ("Output format, supported tags:" ++ (listTags mr_tags))
         )
       <*> toMaybe (strOption (metavar "DIR" <> short 'o' <> help "Output directory" <> value ""))
@@ -208,25 +208,26 @@ cmd (Music go@GenericOptions{..} mo@MusicOptions{..})
     runAPI go $ do
       (API.Response _ (ms :: [MusicRecord])) <- api_S "audio.get" [("q",m_search_string)]
       forM_ ms $ \m -> do
-        io $ printf "%s\n" (mr_format m_output_format m)
+        io $ printf "%s\n" (mr_format m_name_format m)
 
   -- Download music files
   |not (null m_records_id) = do
     let out_dir = fromMaybe "." m_out_dir
     runAPI go $ do
-      (API.Response _ (ms :: [MusicRecord])) <- api_S "audio.getById" [("audios", concat $ intersperse "," m_records_id)]
-      forM_ ms $ \mr@MusicRecord{..} -> do
-        (f, mh) <- liftIO $ openFileMR mo mr
-        case mh of
-          Just h -> do
-            u <- ensure (pure $ Client.urlFromString mr_url_str)
-            r <- Client.downloadFileWith u (BS.hPut h)
-            io $ printf "%d_%d\n" mr_owner_id mr_id
-            io $ printf "%s\n" mr_title
-            io $ printf "%s\n" f
-          Nothing -> do
-            io $ hPutStrLn stderr ("File " ++ f ++ " already exist, skipping")
-        return ()
+      forM_ m_records_id $ \ mrid -> do
+        (API.Response _ (ms :: [MusicRecord])) <- api_S "audio.getById" [("audios", mrid)]
+        forM_ ms $ \mr@MusicRecord{..} -> do
+          (f, mh) <- liftIO $ openFileMR mo mr
+          case mh of
+            Just h -> do
+              u <- ensure (pure $ Client.urlFromString mr_url_str)
+              r <- Client.downloadFileWith u (BS.hPut h)
+              io $ printf "%d_%d\n" mr_owner_id mr_id
+              io $ printf "%s\n" mr_title
+              io $ printf "%s\n" f
+            Nothing -> do
+              io $ hPutStrLn stderr ("File " ++ f ++ " already exist, skipping")
+          return ()
 
 
 -- Download audio files
