@@ -14,6 +14,7 @@ import Data.Text(Text)
 import qualified Data.Text as Text
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Except
 import Control.Monad.State (MonadState, execState, evalStateT, StateT(..), get, modify)
 import Control.Monad.Cont
 import Control.Monad.Reader
@@ -56,7 +57,7 @@ instance API.ToAPIState State where
 instance ToGenericOptions State where
   toGenericOptions = go
 
-initialState :: GenericOptions -> EitherT String IO State
+initialState :: GenericOptions -> ExceptT String IO State
 initialState go = State
   <$> lift (Client.defaultState go)
   <*> pure (Login.defaultState go)
@@ -69,7 +70,7 @@ type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
 
 -- | Main VK monad able to track errors, track full state @State@, set
 -- early exit by the means of continuation monad. See @runVK@
-newtype VK r a = VK { unVK :: Guts VK (StateT State (EitherT String IO)) r a }
+newtype VK r a = VK { unVK :: Guts VK (StateT State (ExceptT String IO)) r a }
   deriving(MonadIO, Functor, Applicative, Monad, MonadState State, MonadReader (r -> VK r r) , MonadCont)
 
 instance MonadClient (VK r) State
@@ -79,10 +80,10 @@ instance MonadLogin (VK r) r State
 instance MonadAPI VK r State
 
 -- | Run the VK script, return final state and error status
-runVK :: VK r r -> StateT State (EitherT String IO) r
+runVK :: VK r r -> StateT State (ExceptT String IO) r
 runVK m = runContT (runReaderT (unVK (catch m)) undefined) return
 
-defaultSuperviser :: (Show a) => VK (R VK a) (R VK a) -> StateT State (EitherT String IO) a
+defaultSuperviser :: (Show a) => VK (R VK a) (R VK a) -> StateT State (ExceptT String IO) a
 defaultSuperviser = go where
   go m = do
     GenericOptions{..} <- toGenericOptions <$> get
@@ -103,10 +104,10 @@ defaultSuperviser = go where
             go (k v)
           False -> do
             alert $ "Unable to query value for " ++ i ++ " since interactive mode is disabled"
-            lift $ left res_desc
+            lift $ throwError res_desc
       _ -> do
         alert $ "Unsupervised error: " ++ res_desc
-        lift $ left res_desc
+        lift $ throwError res_desc
 
 runLogin go = do
   s <- initialState go
@@ -123,5 +124,3 @@ runAPI go@GenericOptions{..} m = do
     False -> do
       modify $ modifyAPIState (\as -> as{api_access_token = l_access_token})
   defaultSuperviser (m >>= return . Fine)
-
-

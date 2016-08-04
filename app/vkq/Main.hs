@@ -6,18 +6,20 @@ module Main where
 
 import Control.Exception (SomeException(..),catch,bracket)
 import Control.Monad
+import Control.Monad.Except
 import Control.Monad.Trans
 import Control.Monad.Trans.Either
 import Control.Arrow ((***))
 import Data.Maybe
 import Data.List
 import Data.Char
-import Data.Text(Text(..),pack)
+import Data.Text(Text(..),pack, unpack)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import Options.Applicative
+import qualified Sound.TagLib as TagLib
 import System.Environment
 import System.Exit
 import System.IO
@@ -156,7 +158,7 @@ main :: IO ()
 main = ( do
   m <- maybe (value "") (value) <$> lookupEnv env_access_token
   o <- execParser (info (helper <*> opts m) (fullDesc <> header "VKontakte social network tool"))
-  r <- runEitherT (cmd o)
+  r <- runExceptT (cmd o)
   case r of
     Left err -> do
       hPutStrLn stderr err
@@ -177,7 +179,7 @@ main = ( do
 
  -}
 
-cmd :: Options -> EitherT String IO ()
+cmd :: Options -> ExceptT String IO ()
 
 -- Login
 cmd (Login go LoginOptions{..}) = do
@@ -221,14 +223,32 @@ cmd (Music go@GenericOptions{..} mo@MusicOptions{..})
           case mh of
             Just h -> do
               u <- ensure (pure $ Client.urlFromString mr_url_str)
-              r <- Client.downloadFileWith u (BS.hPut h)
+              Client.downloadFileWith u (BS.hPut h)
               io $ printf "%d_%d\n" mr_owner_id mr_id
               io $ printf "%s\n" mr_title
               io $ printf "%s\n" f
+              liftIO $ do
+                tagfile <- TagLib.open f
+                case tagfile of
+                  Just tagfile -> do
+                    tag <- TagLib.tag tagfile
+                    case tag of
+                      Just it -> do
+                        it `TagLib.setArtist` ensureUnicode mr_artist
+                        it `TagLib.setTitle`  ensureUnicode mr_title
+                        it `TagLib.setComment` ""
+                        it `TagLib.setAlbum`   ""
+                        it `TagLib.setGenre`   ""
+                        it `TagLib.setTrack`   0
+                        it `TagLib.setYear`    0
+                        TagLib.save tagfile
+                        return ()
+                      where
+                        ensureUnicode = unpack . pack
+
             Nothing -> do
               io $ hPutStrLn stderr ("File " ++ f ++ " already exist, skipping")
           return ()
-
 
 -- Download audio files
 -- cmd (Options v (Music (MO act False [] _ ofmt odir rid sk))) = do
@@ -273,4 +293,3 @@ cmd (DBQ go (DBOptions{..}))
 
   |db_cities = do
     error "not implemented"
-

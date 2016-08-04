@@ -61,8 +61,8 @@ library
                      EitherT,
                      vector,
                      filepath,
-                     directory
-
+                     directory,
+                     taglib
 
 executable vkq
   hs-source-dirs:    app/vkq, app/common, src
@@ -71,5 +71,3 @@ executable vkq
                      Util
   build-depends:     regexpr,
                      text
-
-
