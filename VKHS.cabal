@@ -58,7 +58,6 @@ library
                      clock,
                      optparse-applicative,
                      aeson,
-                     EitherT,
                      vector,
                      filepath,
                      directory,

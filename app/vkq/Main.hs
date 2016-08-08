@@ -8,7 +8,6 @@ import Control.Exception (SomeException(..),catch,bracket)
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Trans
-import Control.Monad.Trans.Either
 import Control.Arrow ((***))
 import Data.Maybe
 import Data.List

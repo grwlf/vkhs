@@ -18,7 +18,6 @@ import Control.Monad.Except
 import Control.Monad.State (MonadState, execState, evalStateT, StateT(..), get, modify)
 import Control.Monad.Cont
 import Control.Monad.Reader
-import Control.Monad.Trans.Either
 
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
