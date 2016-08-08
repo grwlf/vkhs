@@ -24,6 +24,7 @@ import System.Exit
 import System.IO
 import Text.RegexPR
 import Text.Printf
+import Text.Show.Pretty
 
 import Web.VKHS
 import Web.VKHS.Types
@@ -43,6 +44,7 @@ data DBOptions = DBOptions {
 data APIOptions = APIOptions {
     a_method :: String
   , a_args :: String
+  , a_pretty :: Bool
   } deriving(Show)
 
 data LoginOptions = LoginOptions {
@@ -92,8 +94,9 @@ opts m =
 
       api_cmd = (info (API <$> genericOptions <*> (APIOptions
         <$> argument str (metavar "METHOD" <> help "Method name")
-        <*> argument str (metavar "PARAMS" <> help "Method arguments, KEY=VALUE[,KEY2=VALUE2[,,,]]")))
-        ( progDesc "Call VK API method" ))
+        <*> argument str (metavar "PARAMS" <> help "Method arguments, KEY=VALUE[,KEY2=VALUE2[,,,]]")
+        <*> switch (long "pretty" <> help "Pretty print resulting JSON")))
+            ( progDesc "Call VK API method" ))
 
   in subparser (
        command "login" (info (Login <$> genericOptions_login <*> (LoginOptions
@@ -187,11 +190,15 @@ cmd (Login go LoginOptions{..}) = do
     True -> liftIO $ putStrLn $ printf "export %s=%s\n" env_access_token at_access_token
     False -> liftIO $ putStrLn at_access_token
 
--- API
+-- API / CALL
 cmd (API go APIOptions{..}) = do
   runAPI go $ do
     x <- apiJ a_method (map (id *** tpack) $ splitFragments "," "=" a_args)
-    liftIO $ putStrLn $ show x
+    if a_pretty
+      then do
+        liftIO $ BS.putStrLn $ jsonEncodePretty x
+      else
+        liftIO $ BS.putStrLn $ jsonEncode x
   return ()
 
 cmd (Music go@GenericOptions{..} mo@MusicOptions{..})

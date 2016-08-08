@@ -58,10 +58,12 @@ library
                      clock,
                      optparse-applicative,
                      aeson,
+                     aeson-pretty,
                      vector,
                      filepath,
                      directory,
-                     taglib
+                     taglib,
+                     pretty-show
 
 executable vkq
   hs-source-dirs:    app/vkq, app/common, src

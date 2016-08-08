@@ -24,12 +24,13 @@ import Data.Text(Text)
 import qualified Data.Text as Text
 
 import Data.ByteString.Char8 (ByteString)
-import Data.ByteString.Lazy (fromStrict)
+import Data.ByteString.Lazy (fromStrict,toChunks)
 import qualified Data.ByteString.Char8 as BS
 
 import Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
+import qualified Data.Aeson.Encode.Pretty as Aeson
 
 import Text.Printf
 
@@ -121,3 +122,11 @@ api m args = do
 api_S :: (Aeson.FromJSON a, MonadAPI m x s)
     => String -> [(String, String)] -> API m x a
 api_S m args = api m (map (id *** tpack) args)
+
+-- Encode JSON back to string
+jsonEncode :: JSON -> ByteString
+jsonEncode JSON{..} = BS.concat $ toChunks $ Aeson.encode js_aeson
+
+jsonEncodePretty :: JSON -> ByteString
+jsonEncodePretty JSON{..} = BS.concat $ toChunks $ Aeson.encodePretty js_aeson
+
