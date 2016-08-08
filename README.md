@@ -102,7 +102,7 @@ VKHS library
 
 Please, consult the source code of the vkq application.
 
-*Note: Below is the contents of outdated section*
+_Note: Outdated content below_
 
 Following example illustrates basic usage (please fill client\_id, email and
 password with correct values):
@@ -138,7 +138,7 @@ Debugging
 data, but the form appears again. Typically, that means that the password wa
 invalid or captcha is required.
 
-*Note: Below is the contents of outdated section*
+_Note: Outdated content below_
 
 To authenticate the user, vkhs acts like a browser: it analyzes html but fills
 all forms by itself instead of displaying pages. Of cause, would vk.com change
@@ -153,11 +153,6 @@ writing
 
 will trigger curl output plus html dumping to the current directory. Please,
 mail those .html to me if problem appears.
-
-TODO
-====
-* Decrypt 'RepeatedForm' errors
-* Show capchas to users if required
 
 Limitations
 ===========
