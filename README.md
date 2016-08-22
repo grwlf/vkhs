@@ -97,39 +97,30 @@ For example, lets call ausio.search method to get some Beatles records:
     ...
 
 
-VKHS library
-============
+VKHS library/Runhaskell mode
+============================
 
-Please, consult the source code of the vkq application.
+Starting from 1.7.2 there are initial support for RunHaskell-mode. Consider the
+following example:
 
-_Note: Outdated content below_
 
-Following example illustrates basic usage (please fill client\_id, email and
-password with correct values):
+    #!/usr/bin/env runhaskell
+    {-# LANGUAGE RecordWildCards #-}
 
-    import Web.VKHS.Login
-    import Web.VKHS.API
+    import Prelude ()
+    import Web.VKHS
+    import Web.VKHS.Imports
 
-    main = do
-        let client_id = "111111"
-        let e = env client_id "user@example.com" "password" [Photos,Audio,Groups]
-        (Right at) <- login e
+    main :: IO ()
+    main = runVK_ defaultOptions $ do
+      Sized cnt cs <- getCountries
+      forM_ cs $ \Country{..} -> do
+        liftIO $ putStrLn co_title
 
-        let user_of_interest = "222222"
-        (Right ans) <- api e at "users.get" [
-              ("uids",user_of_interest)
-            , ("fields","first_name,last_name,nickname,screen_name")
-            , ("name_case","nom")
-            ]
-        putStrLn ans
-
-client\_id is an application identifier, provided by vk.com. Users receive it
-after registering their applications after SMS confirmation. Registration form is
-located [here](http://vk.com/editapp?act=create).
-
-Internally, library uses small curl-based HTTP automata and tagsoup for jumping
-over relocations and submitting various 'Yes I agree' forms. Curl .so library is
-required for vkhs to work. I am using curl-7.26.0 on my system.
+When executed, the program should ask for login and password and output list of
+countries known to VK. Consider reviewing  Web.VKHS.API.Simple where
+`getCountries` and several other methods are defined. Also, check the source
+code of the `vkq` application for more elaborated usage example.
 
 Debugging
 =========
@@ -137,22 +128,6 @@ Debugging
 `RepatedForm` message means that VKHS tries to fill the web form with available
 data, but the form appears again. Typically, that means that the password wa
 invalid or captcha is required.
-
-_Note: Outdated content below_
-
-To authenticate the user, vkhs acts like a browser: it analyzes html but fills
-all forms by itself instead of displaying pages. Of cause, would vk.com change
-html design, things stop working.
-
-To deal with that potential problem, Ive included some debugging facilities:
-changing:
-
-writing
-
-    (Right at) <- login e { verbose = Debug }
-
-will trigger curl output plus html dumping to the current directory. Please,
-mail those .html to me if problem appears.
 
 Limitations
 ===========
