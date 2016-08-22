@@ -1,10 +1,21 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Web.VKHS where
+module Web.VKHS (
+    module Web.VKHS
+  , module Web.VKHS.Client
+  , module Web.VKHS.Types
+  , module Web.VKHS.Error
+  , module Web.VKHS.Monad
+  , module Web.VKHS.Login
+  , module Web.VKHS.API.Base
+  , module Web.VKHS.API.Types
+  , module Web.VKHS.API.Simple
+  ) where
 
 import Data.List
 import Data.Maybe
@@ -26,16 +37,18 @@ import System.IO
 
 import Web.VKHS.Error
 import Web.VKHS.Types
-import Web.VKHS.Client as Client
-import Web.VKHS.Monad
+import Web.VKHS.Client hiding (Error, Response)
+import qualified Web.VKHS.Client as Client
+import Web.VKHS.Monad hiding (catch)
+import qualified Web.VKHS.Monad as VKHS
 import Web.VKHS.Login (MonadLogin, LoginState(..), ToLoginState(..), printForm, login)
 import qualified Web.VKHS.Login as Login
-import Web.VKHS.API (MonadAPI, APIState(..), ToAPIState(..), api)
-import qualified Web.VKHS.API as API
+import Web.VKHS.API.Base (MonadAPI, APIState(..), ToAPIState(..), api)
+import qualified Web.VKHS.API.Base as API
+import Web.VKHS.API.Types
+import Web.VKHS.API.Simple
 
 import Debug.Trace
-
-{- Test -}
 
 data State = State {
     cs :: ClientState
@@ -79,14 +92,14 @@ instance MonadLogin (VK r) r State
 instance MonadAPI VK r State
 
 -- | Run the VK script, return final state and error status
-runVK :: VK r r -> StateT State (ExceptT String IO) r
-runVK m = runContT (runReaderT (unVK (catch m)) undefined) return
+stepVK :: VK r r -> StateT State (ExceptT String IO) r
+stepVK m = runContT (runReaderT (unVK (VKHS.catch m)) undefined) return
 
 defaultSuperviser :: (Show a) => VK (R VK a) (R VK a) -> StateT State (ExceptT String IO) a
 defaultSuperviser = go where
   go m = do
     GenericOptions{..} <- toGenericOptions <$> get
-    res <- runVK m
+    res <- stepVK m
     res_desc <- pure (describeResult res)
     case res of
       Fine a -> return a
@@ -113,6 +126,7 @@ runLogin go = do
   evalStateT (defaultSuperviser (login >>= return . Fine)) s
 
 
+runAPI :: Show b => GenericOptions -> VK (R VK b) b -> ExceptT String IO b
 runAPI go@GenericOptions{..} m = do
   s <- initialState go
   flip evalStateT s $ do
@@ -123,3 +137,13 @@ runAPI go@GenericOptions{..} m = do
     False -> do
       modify $ modifyAPIState (\as -> as{api_access_token = l_access_token})
   defaultSuperviser (m >>= return . Fine)
+
+runVK :: Show a => GenericOptions -> VK (R VK a) a -> IO (Either String a)
+runVK go = runExceptT . runAPI go
+
+runVK_ :: Show a => GenericOptions -> VK (R VK a) a -> IO ()
+runVK_ go = do
+  runVK go >=> \case
+    Left e -> fail e
+    Right _ -> return ()
+

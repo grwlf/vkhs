@@ -34,6 +34,7 @@ library
                      Web.VKHS.Client
                      Web.VKHS.Login
                      Web.VKHS.Error
+                     Web.VKHS.Imports
                      Web.VKHS.API
                      Web.VKHS.API.Types
                      Web.VKHS.API.Base
