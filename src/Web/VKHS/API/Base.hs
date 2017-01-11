@@ -71,8 +71,9 @@ parseJSON bs = do
 
 -- | Invoke the request. Returns answer as JSON object .
 --
--- See documentation:
--- <http://vk.com/developers.php?oid=-1&p=%D0%9E%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5_%D0%BC%D0%B5%D1%82%D0%BE%D0%B4%D0%BE%D0%B2_API>
+-- See the official documentation:
+-- <https://vk.com/dev/methods>
+-- <https://vk.com/dev/json_schema>
 --
 -- FIXME: We currentyl use Text.unpack to encode text into strings. Use encodeUtf8
 -- instead.

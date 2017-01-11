@@ -252,7 +252,7 @@ requestExecute Request{..} = do
   ClientState{..} <- toClientState <$> get
   clk <- liftIO $ do
     clk <- Clock.getTime Clock.Realtime
-    let interval_ns = timeSpecAsNanoSecs (clk `diffTimeSpec` cl_last_execute)
+    let interval_ns = toNanoSecs (clk `diffTimeSpec` cl_last_execute)
     when (interval_ns < cl_minimum_interval_ns) $ do
       threadDelay (fromInteger $ (cl_minimum_interval_ns - interval_ns) `div` 1000); -- convert ns to us
     return clk
