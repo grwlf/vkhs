@@ -5,6 +5,7 @@ module Web.VKHS.API.Simple where
 
 import Data.List
 import Data.Text (Text)
+import Data.Monoid((<>))
 import qualified Data.Text as Text
 import Data.Function
 import Web.VKHS.Types
@@ -42,3 +43,12 @@ getCities Country{..} mq =
      ("count", tpack (show max_count))
     ] ++
     maybe [] (\q -> [("q",q)]) mq
+
+getGroupWall :: (MonadAPI m x s) => GroupRecord -> API m x (Sized [WallRecord])
+getGroupWall GroupRecord{..} =
+  resp_data <$> do
+  api_ver "wall.get" $
+    [("owner_id", "-" <> tshow gr_id),
+     ("count", "100")
+    ]
+

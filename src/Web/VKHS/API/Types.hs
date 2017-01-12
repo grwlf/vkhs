@@ -83,21 +83,30 @@ data UserRecord = UserRecord
   , ur_graduation :: Maybe Int
   } deriving (Show, Data, Typeable)
 
+{-
+ - API version 5.44
+ -}
 
 data WallRecord = WallRecord
   { wr_id :: Int
   , wr_to_id :: Int
   , wr_from_id :: Int
-  , wr_wtext :: String
-  , wr_wdate :: Int
+  , wr_text :: Text
+  , wr_date :: Int
   } deriving (Show)
 
-publishedAt :: WallRecord -> UTCTime
-publishedAt wr = posixSecondsToUTCTime $ fromIntegral $ wr_wdate wr
+instance FromJSON WallRecord where
+  parseJSON = Aeson.withObject "WallRecord" $ \o ->
+    WallRecord
+      <$> (o .: "id")
+      <*> (o .: "to_id")
+      <*> (o .: "from_id")
+      <*> (o .: "text")
+      <*> (o .: "date")
 
-{-
- - API version 5.44
- -}
+publishedAt :: WallRecord -> UTCTime
+publishedAt wr = posixSecondsToUTCTime $ fromIntegral $ wr_date wr
+
 
 data Sized a = Sized {
     m_count :: Int

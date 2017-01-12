@@ -104,8 +104,8 @@ apiJ mname (map (id *** tunpack) -> margs) = do
   parseJSON (responseBody res)
 
 
--- | Invoke the request, returns answer as a Haskell datatype
--- See also @apiJ@
+-- | Invoke the request, returns answer as a Haskell datatype. On error fall out
+-- to the supervizer (e.g. @VKHS.defaultSuperviser@) See also @apiJ@
 api :: (Aeson.FromJSON a, MonadAPI m x s)
     => String
     -- ^ API method name
@@ -120,6 +120,7 @@ api m args = do
 
 
 -- | String version of @api@
+-- Deprecated
 api_S :: (Aeson.FromJSON a, MonadAPI m x s)
     => String -> [(String, String)] -> API m x a
 api_S m args = api m (map (id *** tpack) args)
