@@ -118,6 +118,29 @@ api m args = do
     Right a -> return a
     Left e -> terminate (JSONParseFailure' j e)
 
+data ErrorReport = ErrorReport String
+
+-- | Invoke the request, returns answer as a Haskell datatype. On error return
+-- default value
+apiE :: (Aeson.FromJSON a, MonadAPI m x s)
+    => a
+    -- ^ Default value
+    -> String
+    -- ^ API method name
+    -> [(String, Text)]
+    -- ^ API method arguments
+    -> API m x (Either ErrorReport a)
+apiE def m args = do
+  j@JSON{..} <- apiJ m args
+  case Aeson.parseEither Aeson.parseJSON js_aeson of
+    Right a -> return (Right a)
+    Left e' -> do
+      log_error "test"
+      case Aeson.parseEither Aeson.parseJSON js_aeson of
+        Right err -> return (Left (ErrorReport err))
+        Left e -> terminate (JSONParseFailure' j e)
+
+
 
 -- | String version of @api@
 -- Deprecated

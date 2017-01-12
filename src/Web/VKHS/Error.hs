@@ -6,6 +6,7 @@ import Web.VKHS.Types
 import Web.VKHS.Client (Response, Request, URL)
 import qualified Web.VKHS.Client as Client
 import Data.ByteString.Char8 (ByteString, unpack)
+import Data.Text (Text)
 
 data Error = ETimeout | EClient Client.Error
   deriving(Show, Eq)
@@ -34,6 +35,7 @@ data Result t a =
   | RepeatedForm Form (() -> t (R t a) (R t a))
   | JSONParseFailure ByteString (JSON -> t (R t a) (R t a))
   | JSONParseFailure' JSON String
+  | LogError Text (() -> t (R t a) (R t a))
 
 data ResultDescription a =
     DescFine a

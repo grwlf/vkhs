@@ -26,6 +26,9 @@ import System.IO
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 
+import Data.Text (Text)
+import qualified Data.Text as Text
+
 import Web.VKHS.Error
 import Web.VKHS.Types
 import Web.VKHS.Client hiding(Error)
@@ -56,6 +59,10 @@ terminate r = do
   err <- ask
   err r
   undefined
+
+-- | Request to the Superviser to log certain @text@
+log_error :: MonadVK (t (R t a)) (Result t a) => Text -> t (R t a) ()
+log_error text = raise (LogError text)
 
 class MonadVK (t r) r => EnsureVK t r c a | c -> a where
   ensure :: t r c -> t r a
