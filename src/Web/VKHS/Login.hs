@@ -24,6 +24,9 @@ import qualified Data.Map as Map
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 
+import Data.Text(Text)
+import qualified Data.Text as Text
+
 import qualified Text.HTML.TagSoup.Parsec as Tagsoup
 import qualified Network.Shpider.Forms as Shpider
 
@@ -65,8 +68,8 @@ class (MonadIO m, MonadClient m s, ToLoginState s, MonadVK m r) => MonadLogin m 
 data RobotAction = DoGET URL Cookies | DoPOST FilledForm Cookies
   deriving(Show)
 
-printAction :: String -> RobotAction -> String
-printAction prefix (DoGET url jar) = prefix ++ " GET " ++ (show url)
+printAction :: String -> RobotAction -> Text
+printAction prefix (DoGET url jar) = tpack $ prefix ++ " GET " ++ (show url)
 printAction prefix (DoPOST FilledForm{..} jar) = printForm prefix fform
 
 type Login m x a = m (R m x) a
@@ -94,11 +97,12 @@ initialAction = do
             ]))
   return (DoGET u (cookiesCreate ()))
 
-printForm :: String -> Shpider.Form -> String
+printForm :: String -> Shpider.Form -> Text
 printForm prefix Shpider.Form{..} =
   let
     telln x = tell (x ++ "\n")
   in
+  tpack $
   execWriter $ do
     telln $ prefix ++ "Form #" ++ " (" ++ (show method) ++ ") Action " ++ action
     forM_ (Map.toList inputs) $ \(input,value) -> do
@@ -154,11 +158,11 @@ analyzeResponse (res, jar) = do
       title = Shpider.gatherTitle tags
       forms = map (Form title) (Shpider.gatherForms tags)
   dumpResponseBody "latest.html" res
-  debug ("< 0 Title: " ++ title)
+  debug ("< 0 Title: " <> tpack title)
 
   case (responseRedirect res) of
     Just url -> do
-      debug $ "< 0 Fragments: " ++ show (urlFragments url)
+      debug $ "< 0 Fragments: " <> tshow (urlFragments url)
       maybe (return $ Left $ DoGET url jar) (\x -> return $ Right x) $ do
         let frg = (urlFragments url)
         at_access_token <- lookup "access_token" frg
@@ -184,7 +188,6 @@ login = initialAction >>= go where
   go a = do
     req <- actionRequest a
     res <- analyzeResponse req
-    -- trace (show res) $ do
     case res of
       Left a' -> go a'
       Right at -> return at

@@ -28,6 +28,7 @@ import qualified Data.ByteString.Char8 as BS
 
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
 
 import Web.VKHS.Error
 import Web.VKHS.Types
@@ -79,26 +80,14 @@ instance (MonadVK (t (R t x)) (R t x)) => EnsureVK t (R t x) (Either Client.Erro
       (Right u) -> return u
       (Left e) -> raise (\k -> UnexpectedURL e k)
 
--- instance EnsureVK (Either Client.Error Request) Request where
---   ensure m  = m >>= \x ->
---     case x of
---       (Right u) -> return u
---       (Left e) -> raiseError (\k -> UnexpectedRequest e k)
-
--- instance EnsureVK (Either Client.Error URL) URL where
---   ensure m  = m >>= \x ->
---     case x of
---       (Right u) -> return u
---       (Left e) -> raiseError (\k -> UnexpectedURL e k)
-
-
-debug :: (ToGenericOptions s, MonadState s m, MonadIO m) => String -> m ()
+debug :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
 debug str = do
   GenericOptions{..} <- gets toGenericOptions
   when o_verbose $ do
-    liftIO $ hPutStrLn stderr str
+    liftIO $ Text.hPutStrLn stderr str
 
-alert :: (ToGenericOptions s, MonadState s m, MonadIO m) => String -> m ()
+alert :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
 alert str = do
-    liftIO $ hPutStrLn stderr str
+    liftIO $ Text.hPutStrLn stderr str
+
 

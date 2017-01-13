@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Web.VKHS.Error where
@@ -7,6 +8,7 @@ import Web.VKHS.Client (Response, Request, URL)
 import qualified Web.VKHS.Client as Client
 import Data.ByteString.Char8 (ByteString, unpack)
 import Data.Text (Text)
+import Data.Monoid ((<>))
 
 data Error = ETimeout | EClient Client.Error
   deriving(Show, Eq)
@@ -35,6 +37,9 @@ data Result t a =
   | RepeatedForm Form (() -> t (R t a) (R t a))
   | JSONParseFailure ByteString (JSON -> t (R t a) (R t a))
   | JSONParseFailure' JSON String
+  | JSONCovertionFailure JSON (JSON -> t (R t a) (R t a))
+  -- ^ Failed to convert JSON into Haskell object. Superwiser may wish to
+  -- replace the JSON with the correct one
   | LogError Text (() -> t (R t a) (R t a))
 
 data ResultDescription a =
@@ -42,14 +47,16 @@ data ResultDescription a =
   | DescError String
   deriving(Show)
 
-describeResult :: (Show a) => Result t a -> String
-describeResult (Fine a) = "Fine " ++ show a
-describeResult (UnexpectedInt e k) = "UnexpectedInt " ++ (show e)
-describeResult (UnexpectedBool e k) = "UnexpectedBool " ++  (show e)
-describeResult (UnexpectedURL e k) = "UnexpectedURL " ++ (show e)
-describeResult (UnexpectedRequest e k) = "UnexpectedRequest " ++ (show e)
+describeResult :: (Show a) => Result t a -> Text
+describeResult (Fine a) = "Fine " <> tshow a
+describeResult (UnexpectedInt e k) = "UnexpectedInt " <> (tshow e)
+describeResult (UnexpectedBool e k) = "UnexpectedBool " <>  (tshow e)
+describeResult (UnexpectedURL e k) = "UnexpectedURL " <> (tshow e)
+describeResult (UnexpectedRequest e k) = "UnexpectedRequest " <> (tshow e)
 describeResult LoginActionsExhausted = "LoginActionsExhausted"
 describeResult (RepeatedForm f k) = "RepeatedForm"
-describeResult (JSONParseFailure bs _) = "JSONParseFailure " ++ (show bs)
-describeResult (JSONParseFailure' JSON{..} s) = "JSONParseFailure' " ++ (show s) ++ " JSON: " ++ (take 1000 $ show js_aeson)
+describeResult (JSONParseFailure bs _) = "JSONParseFailure " <> (tshow bs)
+describeResult (JSONParseFailure' JSON{..} s) = "JSONParseFailure' " <> (tshow s) <> " JSON: " <> (tpack $ take 1000 $ show js_aeson)
+describeResult (LogError t k) = "LogError " <> (tshow t)
+describeResult (JSONCovertionFailure j k) = "JSONConvertionFailure " <> (tshow j)
 

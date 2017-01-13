@@ -21,6 +21,7 @@ import Data.List
 import Data.Maybe
 import Data.Time
 import Data.Either
+import Data.Monoid((<>))
 import Data.Text(Text)
 import qualified Data.Text as Text
 import Control.Applicative
@@ -69,9 +70,9 @@ instance API.ToAPIState State where
 instance ToGenericOptions State where
   toGenericOptions = go
 
-initialState :: GenericOptions -> ExceptT String IO State
+initialState :: (MonadIO m) => GenericOptions -> m State
 initialState go = State
-  <$> lift (Client.defaultState go)
+  <$> liftIO (Client.defaultState go)
   <*> pure (Login.defaultState go)
   <*> pure (API.defaultState)
   <*> pure go
@@ -82,7 +83,7 @@ type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
 
 -- | Main VK monad able to track errors, track full state @State@, set
 -- early exit by the means of continuation monad. See @runVK@
-newtype VK r a = VK { unVK :: Guts VK (StateT State (ExceptT String IO)) r a }
+newtype VK r a = VK { unVK :: Guts VK (StateT State (ExceptT Text IO)) r a }
   deriving(MonadIO, Functor, Applicative, Monad, MonadState State, MonadReader (r -> VK r r) , MonadCont)
 
 instance MonadClient (VK r) State
@@ -92,10 +93,10 @@ instance MonadLogin (VK r) r State
 instance MonadAPI VK r State
 
 -- | Run the VK script, return final state and error status
-stepVK :: VK r r -> StateT State (ExceptT String IO) r
+stepVK :: VK r r -> StateT State (ExceptT Text IO) r
 stepVK m = runContT (runReaderT (unVK (VKHS.catch m)) undefined) return
 
-defaultSuperviser :: (Show a) => VK (R VK a) (R VK a) -> StateT State (ExceptT String IO) a
+defaultSuperviser :: (Show a) => VK (R VK a) (R VK a) -> StateT State (ExceptT Text IO) a
 defaultSuperviser = go where
   go m = do
     GenericOptions{..} <- toGenericOptions <$> get
@@ -107,26 +108,30 @@ defaultSuperviser = go where
         alert "UnexpectedInt (ignoring)"
         go (k 0)
       UnexpectedFormField (Form tit f) i k -> do
-        alert $ "While filling form " ++ (printForm "" f)
+        alert $ "While filling form " <> (printForm "" f)
         case o_allow_interactive of
           True -> do
             v <- do
-              alert $ "Please, enter the correct value for input " ++ i ++ " : "
+              alert $ "Please, enter the correct value for input " <> tpack i <> " : "
               liftIO $ getLine
             go (k v)
           False -> do
-            alert $ "Unable to query value for " ++ i ++ " since interactive mode is disabled"
+            alert $ "Unable to query value for " <> tpack i <> " since interactive mode is disabled"
             lift $ throwError res_desc
+      LogError text k -> do
+        alert text
+        go (k ())
       _ -> do
-        alert $ "Unsupervised error: " ++ res_desc
+        alert $ "Unsupervised error: " <> res_desc
         lift $ throwError res_desc
 
+runLogin :: GenericOptions -> ExceptT Text IO AccessToken
 runLogin go = do
   s <- initialState go
   evalStateT (defaultSuperviser (login >>= return . Fine)) s
 
 
-runAPI :: Show b => GenericOptions -> VK (R VK b) b -> ExceptT String IO b
+runAPI :: Show b => GenericOptions -> VK (R VK b) b -> ExceptT Text IO b
 runAPI go@GenericOptions{..} m = do
   s <- initialState go
   flip evalStateT s $ do
@@ -138,12 +143,12 @@ runAPI go@GenericOptions{..} m = do
       modify $ modifyAPIState (\as -> as{api_access_token = l_access_token})
   defaultSuperviser (m >>= return . Fine)
 
-runVK :: Show a => GenericOptions -> VK (R VK a) a -> IO (Either String a)
+runVK :: Show a => GenericOptions -> VK (R VK a) a -> IO (Either Text a)
 runVK go = runExceptT . runAPI go
 
 runVK_ :: Show a => GenericOptions -> VK (R VK a) a -> IO ()
 runVK_ go = do
   runVK go >=> \case
-    Left e -> fail e
+    Left e -> fail (tunpack e)
     Right _ -> return ()
 

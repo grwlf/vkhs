@@ -11,6 +11,8 @@ import Data.Typeable
 import Data.Data
 import Data.Time.Clock
 import Data.Time.Clock.POSIX
+import Data.Monoid ((<>), Monoid(..))
+import Control.Applicative ((<|>))
 
 import Data.Aeson ((.=), (.:), (.:?), (.!=), FromJSON(..))
 import qualified Data.Aeson as Aeson
@@ -22,7 +24,7 @@ import Data.Text
 import Text.Printf
 
 import Web.VKHS.Error
-import Web.VKHS.API.Base
+-- import Web.VKHS.API.Base
 
 -- See http://vk.com/developers.php?oid=-1&p=Авторизация_клиентских_приложений
 -- (in Russian) for more details
@@ -33,15 +35,18 @@ data Response a = Response {
   }
   deriving (Show, Data, Typeable)
 
+emptyResponse :: (Monoid a) => Response a
+emptyResponse = Response (Aeson.object []) mempty
+
 parseJSON_obj_error :: String -> Aeson.Value -> Aeson.Parser a
 parseJSON_obj_error name o = fail $
   printf "parseJSON: %s expects object, got %s" (show name) (show o)
 
 instance (FromJSON a) => FromJSON (Response a) where
   parseJSON j = Aeson.withObject "Response" (\o ->
-    Response <$> pure j <*> o .: "response") j
+    Response <$> pure j <*> (o .: "response" <|> o.: "error")) j
 
--- Deprecated
+-- | DEPRECATED, use @Sized@ instead
 data SizedList a = SizedList Int [a]
   deriving(Show, Data, Typeable)
 
@@ -61,14 +66,14 @@ data MusicRecord = MusicRecord
   } deriving (Show, Data, Typeable)
 
 instance FromJSON MusicRecord where
-  parseJSON = Aeson.withObject "MusicRecord" (\o ->
+  parseJSON = Aeson.withObject "MusicRecord" $ \o ->
     MusicRecord
       <$> (o .: "aid")
       <*> (o .: "owner_id")
       <*> (o .: "artist")
       <*> (o .: "title")
       <*> (o .: "duration")
-      <*> (o .: "url"))
+      <*> (o .: "url")
 
 
 data UserRecord = UserRecord
@@ -85,11 +90,22 @@ data UserRecord = UserRecord
 
 {-
  - API version 5.44
+ - <https://vk.com/dev/json_schema>
  -}
+
+data ErrorRecord = ErrorRecord
+  { er_code :: Int
+  , er_msg :: Text
+  } deriving(Show)
+
+instance FromJSON ErrorRecord where
+  parseJSON = Aeson.withObject "ErrorRecord" $ \o ->
+    ErrorRecord
+      <$> (o .: "error_code")
+      <*> (o .: "error_msg")
 
 data WallRecord = WallRecord
   { wr_id :: Int
-  , wr_to_id :: Int
   , wr_from_id :: Int
   , wr_text :: Text
   , wr_date :: Int
@@ -99,7 +115,6 @@ instance FromJSON WallRecord where
   parseJSON = Aeson.withObject "WallRecord" $ \o ->
     WallRecord
       <$> (o .: "id")
-      <*> (o .: "to_id")
       <*> (o .: "from_id")
       <*> (o .: "text")
       <*> (o .: "date")
@@ -117,6 +132,9 @@ instance FromJSON a => FromJSON (Sized a) where
   parseJSON = Aeson.withObject "Result" (\o ->
     Sized <$> o .: "count" <*> o .: "items")
 
+instance Monoid a => Monoid (Sized a) where
+  mempty = Sized 0 mempty
+  mappend (Sized x a) (Sized y b) = Sized (x+y) (a<>b)
 
 data Deact = Banned | Deleted | OtherDeact Text
   deriving(Show,Eq,Ord)
@@ -137,7 +155,6 @@ instance FromJSON GroupType where
               "group" -> Group
               "page" -> Public
               "event" -> Event
-
 
 data GroupIsClosed = GroupOpen | GroupClosed | GroupPrivate
   deriving(Show,Eq,Ord,Enum)

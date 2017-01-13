@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -35,9 +36,10 @@ import qualified Data.Aeson.Encode.Pretty as Aeson
 import Text.Printf
 
 import Web.VKHS.Types
-import Web.VKHS.Client
+import Web.VKHS.Client hiding (Response(..))
 import Web.VKHS.Monad
 import Web.VKHS.Error
+import Web.VKHS.API.Types
 
 import Debug.Trace
 
@@ -97,7 +99,7 @@ apiJ mname (map (id *** tunpack) -> margs) = do
           (URL_Path ("/method/" ++ mname))
           (buildQuery (("access_token", api_access_token):margs)))
 
-  debug $ "> " ++ (show url)
+  debug $ "> " <> (tshow url)
 
   req <- ensure (requestCreateGet url (cookiesCreate ()))
   (res, jar') <- requestExecute req
@@ -105,7 +107,8 @@ apiJ mname (map (id *** tunpack) -> margs) = do
 
 
 -- | Invoke the request, returns answer as a Haskell datatype. On error fall out
--- to the supervizer (e.g. @VKHS.defaultSuperviser@) See also @apiJ@
+-- to the supervizer (e.g. @VKHS.defaultSuperviser@) without possibility to
+-- continue
 api :: (Aeson.FromJSON a, MonadAPI m x s)
     => String
     -- ^ API method name
@@ -118,29 +121,34 @@ api m args = do
     Right a -> return a
     Left e -> terminate (JSONParseFailure' j e)
 
-data ErrorReport = ErrorReport String
 
--- | Invoke the request, returns answer as a Haskell datatype. On error return
--- default value
+-- | Invoke the request, returns answer as a Haskell datatype or @ErrorRecord@
+-- object
 apiE :: (Aeson.FromJSON a, MonadAPI m x s)
+    => String           -- ^ API method name
+    -> [(String, Text)] -- ^ API method arguments
+    -> API m x (Either (Response ErrorRecord) a)
+apiE m args = apiJ m args >>= convert where
+  convert j@JSON{..} = do
+    err <- pure $ Aeson.parseEither Aeson.parseJSON js_aeson
+    ans <- pure $ Aeson.parseEither Aeson.parseJSON js_aeson
+    case  (ans, err) of
+      (Right a, _) -> return (Right a)
+      (Left a, Right e) -> return (Left e)
+      (Left a, Left e) -> do
+        j' <- raise (JSONCovertionFailure j)
+        convert j'
+
+-- | Invoke the request, returns answer or the default value in case of error
+apiD :: (Aeson.FromJSON a, MonadAPI m x s)
     => a
-    -- ^ Default value
-    -> String
-    -- ^ API method name
-    -> [(String, Text)]
-    -- ^ API method arguments
-    -> API m x (Either ErrorReport a)
-apiE def m args = do
-  j@JSON{..} <- apiJ m args
-  case Aeson.parseEither Aeson.parseJSON js_aeson of
-    Right a -> return (Right a)
-    Left e' -> do
-      log_error "test"
-      case Aeson.parseEither Aeson.parseJSON js_aeson of
-        Right err -> return (Left (ErrorReport err))
-        Left e -> terminate (JSONParseFailure' j e)
-
-
+    -> String           -- ^ API method name
+    -> [(String, Text)] -- ^ API method arguments
+    -> API m x a
+apiD def m args =
+  apiE m args >>= \case
+    Left err -> return def
+    Right x -> return x
 
 -- | String version of @api@
 -- Deprecated
