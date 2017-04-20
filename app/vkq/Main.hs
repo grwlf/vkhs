@@ -14,6 +14,7 @@ import Data.List
 import Data.Char
 import Data.Text(Text(..),pack, unpack)
 import qualified Data.Text as Text
+import Data.Text.IO(putStrLn, hPutStrLn)
 import qualified Data.Text.IO as Text
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -21,10 +22,11 @@ import Options.Applicative
 import qualified Sound.TagLib as TagLib
 import System.Environment
 import System.Exit
-import System.IO
+import System.IO(stderr)
 import Text.RegexPR
 import Text.Printf
 import Text.Show.Pretty
+import Prelude hiding(putStrLn)
 
 import Web.VKHS
 import Web.VKHS.Types
@@ -168,7 +170,7 @@ main = ( do
     Right _ -> do
       return ()
   )`catch` (\(e::SomeException) -> do
-    putStrLn $ (show e)
+    putStrLn $ Text.pack (show e)
     exitFailure
   )
 
@@ -181,14 +183,14 @@ main = ( do
 
  -}
 
-cmd :: Options -> ExceptT String IO ()
+cmd :: Options -> ExceptT Text IO ()
 
 -- Login
 cmd (Login go LoginOptions{..}) = do
   AccessToken{..} <- runLogin go
   case l_eval of
-    True -> liftIO $ putStrLn $ printf "export %s=%s\n" env_access_token at_access_token
-    False -> liftIO $ putStrLn at_access_token
+    True -> liftIO $ putStrLn $ Text.pack $ printf "export %s=%s\n" env_access_token at_access_token
+    False -> liftIO $ putStrLn $ Text.pack at_access_token
 
 -- API / CALL
 cmd (API go APIOptions{..}) = do
@@ -253,7 +255,7 @@ cmd (Music go@GenericOptions{..} mo@MusicOptions{..})
                         ensureUnicode = unpack . pack
 
             Nothing -> do
-              io $ hPutStrLn stderr ("File " ++ f ++ " already exist, skipping")
+              io $ hPutStrLn stderr ("File " <> Text.pack f <> " already exist, skipping")
           return ()
 
 -- Download audio files
