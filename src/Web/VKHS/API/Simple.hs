@@ -52,3 +52,22 @@ getGroupWall GroupRecord{..} =
      ("count", "100")
     ]
 
+-- TODO: Take User as argument for more type-safety
+getAlbums :: (MonadAPI m x s) => Maybe Integer -> API m x (Sized [Album])
+getAlbums muid =
+  resp_data <$> do
+  apiSimple emptyResponse "photos.getAlbums" $
+    (case muid of
+     Just uid -> [("owner_id", tshow uid)]
+     Nothing -> [])
+    <>
+    [("need_system", "1")
+    ]
+
+getPhotoUploadServer :: (MonadAPI m x s) => Album -> API m x PhotoUploadServer
+getPhotoUploadServer Album{..} =
+  resp_data <$> do
+  api "photos.getUploadServer" $
+    [("album_id", tshow al_id)
+    ]
+

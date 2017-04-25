@@ -53,6 +53,11 @@ data LoginOptions = LoginOptions {
     l_eval :: Bool
   } deriving(Show)
 
+data PhotoOptions = PhotoOptions {
+    p_listAlbums :: Bool
+  , p_uploadServer :: Bool
+  } deriving(Show)
+
 data Options
   = Login GenericOptions LoginOptions
   | API GenericOptions APIOptions
@@ -61,6 +66,7 @@ data Options
   | WallQ GenericOptions WallOptions
   | GroupQ GenericOptions GroupOptions
   | DBQ GenericOptions DBOptions
+  | Photo GenericOptions PhotoOptions
   deriving(Show)
 
 toMaybe :: (Functor f) => f String -> f (Maybe String)
@@ -156,6 +162,12 @@ opts m =
       <*> flag False True (long "list-cities" <> help "List known cities")
       ))
       ( progDesc "Extract generic DB information"))
+
+    <> command "photo" (info ( Photo <$> genericOptions <*> (PhotoOptions
+      <$> flag False True (long "list-albums" <> help "List Albums")
+      <*> flag False True (long "upload-server" <> help "Get upload server")
+      ))
+      ( progDesc "Photo-related queries"))
     )
 
 main :: IO ()
@@ -301,3 +313,26 @@ cmd (DBQ go (DBOptions{..}))
 
   |db_cities = do
     error "not implemented"
+
+cmd (Photo go PhotoOptions{..})
+
+  |p_listAlbums = do
+    runAPI go $ do
+      (Sized cnt als) <- getAlbums Nothing
+      forM_ als $ \Album{..} -> do
+        liftIO $ Text.putStrLn $ Text.concat [ tshow al_id, "\t",  al_title]
+
+  |p_uploadServer = do
+    runAPI go $ do
+      (Sized cnt als) <- getAlbums Nothing
+      let album = [a | a <- als, al_id a == -7]
+      case album of
+        [a] -> do
+          PhotoUploadServer{..} <- getPhotoUploadServer a
+          liftIO $ Text.putStrLn pus_upload_url
+        _ ->
+          error "Ivalid album"
+
+  |otherwise = do
+    error "invalid command line arguments"
+

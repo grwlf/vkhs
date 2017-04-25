@@ -235,3 +235,26 @@ instance FromJSON City where
       <*> (o .:? "area")
       <*> (o .:? "region")
 
+data Album = Album {
+  al_id :: Integer
+, al_title :: Text
+} deriving(Show)
+
+instance FromJSON Album where
+  parseJSON = Aeson.withObject "Album" $ \o ->
+    Album
+      <$> (o .: "id")
+      <*> (o .: "title")
+
+data PhotoUploadServer = PhotoUploadServer {
+    pus_upload_url :: Text
+  , pus_user_id :: Text
+  , pus_album_id :: Text
+} deriving(Show)
+
+instance FromJSON PhotoUploadServer where
+  parseJSON = Aeson.withObject "PhotoUploadServer" $ \o ->
+    PhotoUploadServer
+      <$> (o .: "upload_url")
+      <*> (o .: "album_id")
+      <*> (o .: "user_id")
