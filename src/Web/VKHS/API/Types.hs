@@ -24,19 +24,20 @@ import Data.Text
 import Text.Printf
 
 import Web.VKHS.Error
+import Web.VKHS.Types
 -- import Web.VKHS.API.Base
 
 -- See http://vk.com/developers.php?oid=-1&p=Авторизация_клиентских_приложений
 -- (in Russian) for more details
 
 data Response a = Response {
-    resp_json :: Aeson.Value
+    resp_json :: JSON
   , resp_data :: a
   }
   deriving (Show, Data, Typeable)
 
 emptyResponse :: (Monoid a) => Response a
-emptyResponse = Response (Aeson.object []) mempty
+emptyResponse = Response (JSON $ Aeson.object []) mempty
 
 parseJSON_obj_error :: String -> Aeson.Value -> Aeson.Parser a
 parseJSON_obj_error name o = fail $
@@ -44,7 +45,7 @@ parseJSON_obj_error name o = fail $
 
 instance (FromJSON a) => FromJSON (Response a) where
   parseJSON j = Aeson.withObject "Response" (\o ->
-    Response <$> pure j <*> (o .: "response" <|> o.: "error")) j
+    Response <$> pure (JSON j) <*> (o .: "response" <|> o.: "error")) j
 
 -- | DEPRECATED, use @Sized@ instead
 data SizedList a = SizedList Int [a]
@@ -76,22 +77,35 @@ instance FromJSON MusicRecord where
       <*> (o .: "url")
 
 
-data UserRecord = UserRecord
-  { ur_id :: Int
-  , ur_first_name :: String
-  , ur_last_name :: String
-  , ur_photo :: String
-  , ur_university :: Maybe Int
-  , ur_university_name :: Maybe String
-  , ur_faculty :: Maybe Int
-  , ur_faculty_name :: Maybe String
-  , ur_graduation :: Maybe Int
-  } deriving (Show, Data, Typeable)
-
 {-
  - API version 5.44
  - <https://vk.com/dev/json_schema>
  -}
+
+
+data UserRecord = UserRecord
+  { ur_id :: Integer
+  , ur_first_name :: Text
+  , ur_last_name :: Text
+  , ur_deactivated :: Maybe Text
+  , ur_hidden :: Maybe Integer
+  -- , ur_photo :: String
+  -- , ur_university :: Maybe Int
+  -- , ur_university_name :: Maybe String
+  -- , ur_faculty :: Maybe Int
+  -- , ur_faculty_name :: Maybe String
+  -- , ur_graduation :: Maybe Int
+  } deriving (Show, Data, Typeable)
+
+instance FromJSON UserRecord where
+  parseJSON = Aeson.withObject "UserRecord" $ \o ->
+    UserRecord
+      <$> (o .: "id")
+      <*> (o .: "first_name")
+      <*> (o .: "last_name")
+      <*> (o .:? "deactivated")
+      <*> (o .:? "hidden")
+
 
 data ErrorRecord = ErrorRecord
   { er_code :: Int
@@ -258,3 +272,39 @@ instance FromJSON PhotoUploadServer where
       <$> (o .: "upload_url")
       <*> (o .: "album_id")
       <*> (o .: "user_id")
+
+data OwnerUploadServer = OwnerUploadServer {
+    ous_upload_url :: Text
+  } deriving(Show, Data, Typeable)
+
+instance FromJSON OwnerUploadServer where
+  parseJSON = Aeson.withObject "OwnerUploadServer" $ \o ->
+    OwnerUploadServer
+      <$>  (o .: "upload_url")
+
+data UploadRecord = UploadRecord {
+    upl_server :: Integer
+  , upl_photo :: Text
+  , upl_hash :: Text
+  } deriving(Show, Data, Typeable)
+
+instance FromJSON UploadRecord where
+  parseJSON = Aeson.withObject "UploadRecord" $ \o ->
+    UploadRecord
+      <$>  (o .: "server")
+      <*>  (o .: "photo")
+      <*>  (o .: "hash")
+
+
+
+data PhotoSaveResult = PhotoSaveResult {
+    photo_hash :: Text
+  , photo_src :: Text
+  } deriving(Show, Data, Typeable)
+
+instance FromJSON PhotoSaveResult where
+  parseJSON = Aeson.withObject "PhotoSaveResult" $ \o ->
+    PhotoSaveResult
+      <$>  (o .: "photo_hash")
+      <*>  (o .: "photo_src")
+

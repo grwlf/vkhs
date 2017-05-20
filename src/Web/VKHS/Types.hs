@@ -1,10 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 module Web.VKHS.Types where
 
 import Data.List
 import Data.Char
+import Data.Data
+import Data.Typeable
 
 import Data.Text(Text)
 import qualified Data.Text as Text
@@ -94,7 +97,7 @@ newtype AppID = AppID { aid_string :: String }
 
 
 data JSON = JSON { js_aeson :: Aeson.Value }
-  deriving(Show)
+  deriving(Show, Data, Typeable)
 
 data Form = Form {
     form_title :: String

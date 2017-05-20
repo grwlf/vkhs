@@ -79,6 +79,7 @@ parseJSON bs = do
 --
 -- FIXME: We currentyl use Text.unpack to encode text into strings. Use encodeUtf8
 -- instead.
+-- FIXME: Split into request builder and request executer
 apiJ :: (MonadAPI m x s)
     => String
     -- ^ API method name
@@ -106,7 +107,7 @@ apiJ mname (map (id *** tunpack) -> margs) = do
   parseJSON (responseBody res)
 
 
--- | Invoke the request, returns answer as a Haskell datatype. On error fall out
+-- | Invoke the request, return answer as a Haskell datatype. On error fall out
 -- to the supervizer (e.g. @VKHS.defaultSuperviser@) without possibility to
 -- continue
 api :: (Aeson.FromJSON a, MonadAPI m x s)
@@ -122,7 +123,7 @@ api m args = do
     Left e -> terminate (JSONParseFailure' j e)
 
 
--- | Invoke the request, returns answer as a Haskell datatype or @ErrorRecord@
+-- | Invoke the request, return answer as a Haskell datatype or @ErrorRecord@
 -- object
 apiE :: (Aeson.FromJSON a, MonadAPI m x s)
     => String           -- ^ API method name
@@ -136,7 +137,8 @@ apiE m args = apiJ m args >>= convert where
       (Right a, _) -> return (Right a)
       (Left a, Right e) -> return (Left e)
       (Left a, Left e) -> do
-        j' <- raise (JSONCovertionFailure j)
+        j' <- raise (JSONCovertionFailure
+                     (j, "apiE: " <> Text.pack m <> ": expecting either known response or error"))
         convert j'
 
 -- | Invoke the request, returns answer or the default value in case of error

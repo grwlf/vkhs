@@ -131,9 +131,10 @@ invalid or captcha is required.
 
 Limitations
 ===========
-* Implicit-flow authentication, see [documentation in
-  Russian](http://vk.com/developers.php?oid=-1&p=Авторизация_клиентских_приложений)
+* Implicit-flow authentication, see
+  [documentation in Russian](http://vk.com/developers.php?oid=-1&p=Авторизация_клиентских_приложений)
   for details
+* [VK API documentation](https://vk.com/dev/methods)
 
 License
 =======

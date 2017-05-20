@@ -22,9 +22,8 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.List.Split
 import Data.Text(Text)
-
+import qualified Data.Text as Text
 import Control.Concurrent (threadDelay)
-
 import System.IO as IO
 import System.IO.Unsafe as IO
 import System.Clock as Clock
@@ -207,6 +206,18 @@ requestCreatePost (FilledForm tit Shpider.Form{..}) c = do
           return $ Left err
         Right Request{..} -> do
           return $ Right $ Request (Client.urlEncodedBody (map (BS.pack *** BS.pack) $ Map.toList inputs) req) req_jar
+
+requestUploadPhoto :: (MonadClient m s) => Text -> ByteString -> m (Either Error Request)
+requestUploadPhoto text_url bs = do
+  case Client.parseURI (Text.unpack text_url) of
+    Nothing -> return (Left (ErrorParseURL (Text.unpack text_url) "parseURI failed"))
+    Just uri -> do
+      r <- requestCreateGet (URL uri) (cookiesCreate ())
+      case r of
+        Left err -> do
+          return $ Left err
+        Right Request{..} -> do
+          return $ Right $ Request ((Client.urlEncodedBody [("photo", bs)]) req) req_jar
 
 data Response = Response {
     resp :: Client.Response (Pipes.Producer ByteString IO ())

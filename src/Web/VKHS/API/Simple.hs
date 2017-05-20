@@ -3,12 +3,21 @@
 {-# LANGUAGE RecordWildCards #-}
 module Web.VKHS.API.Simple where
 
+import Control.Monad.Trans (liftIO)
 import Data.List
 import Data.Text (Text)
 import Data.Monoid((<>))
 import qualified Data.Text as Text
+import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Types as Aeson
 import Data.Function
 import Web.VKHS.Types
+import Web.VKHS.Monad
+import Web.VKHS.Error
+import Web.VKHS.Types(tshow)
+import Web.VKHS.Client(requestUploadPhoto, requestExecute, responseBody, responseBodyS)
 import Web.VKHS.API.Base
 import Web.VKHS.API.Types
 
@@ -16,6 +25,7 @@ max_count = 1000
 ver = "5.44"
 
 apiSimple def nm args = apiD def nm (("v",ver):args)
+apiVer nm args = api nm (("v",ver):args)
 
 groupSearch :: (MonadAPI m x s) => Text -> API m x (Sized [GroupRecord])
 groupSearch q =
@@ -70,4 +80,38 @@ getPhotoUploadServer Album{..} =
   api "photos.getUploadServer" $
     [("album_id", tshow al_id)
     ]
+
+
+getCurrentUser :: (MonadAPI m x s) => API m x UserRecord
+getCurrentUser = do
+  Response{..} <- apiVer "users.get" []
+  users <- pure resp_data
+  case (length users == 1) of
+    False -> terminate (JSONParseFailure' resp_json "getCurrentUser: expecting single UserRecord")
+    True -> return (head users)
+
+
+-- FIXME: move low-level upload code to API.Base
+setUserPhoto :: (MonadAPI m x s) => UserRecord -> FilePath -> API m x ()
+setUserPhoto UserRecord{..} photo_path =  do
+  photo <- liftIO $ BS.readFile photo_path
+  OwnerUploadServer{..} <-
+    resp_data <$> api "photos.getOwnerPhotoUploadServer"
+      [("owner_id", tshow ur_id)]
+  req <- ensure $ requestUploadPhoto ous_upload_url photo
+  (res, _) <- requestExecute req
+  j@JSON{..} <- parseJSON (responseBody res)
+  liftIO $ putStrLn $ (responseBodyS res)
+  UploadRecord{..} <-
+    case Aeson.parseEither Aeson.parseJSON js_aeson of
+      Right a -> return a
+      Left e -> terminate (JSONParseFailure' j e)
+  Response{..} <- api "photos.saveOwnerPhoto"
+      [("server", tshow upl_server)
+      ,("hash", upl_hash)
+      ,("photo", upl_photo)]
+  PhotoSaveResult{..} <- pure resp_data
+  return ()
+
+
 

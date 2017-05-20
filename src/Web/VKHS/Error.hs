@@ -37,9 +37,9 @@ data Result t a =
   | RepeatedForm Form (() -> t (R t a) (R t a))
   | JSONParseFailure ByteString (JSON -> t (R t a) (R t a))
   | JSONParseFailure' JSON String
-  | JSONCovertionFailure JSON (JSON -> t (R t a) (R t a))
-  -- ^ Failed to convert JSON into Haskell object. Superwiser may wish to
-  -- replace the JSON with the correct one
+  | JSONCovertionFailure (JSON, Text) (JSON -> t (R t a) (R t a))
+  -- ^ Failed to convert JSON into Haskell object, Text describes an error.
+  -- Superwiser may wish to replace the JSON with the correct one
   | LogError Text (() -> t (R t a) (R t a))
 
 data ResultDescription a =
