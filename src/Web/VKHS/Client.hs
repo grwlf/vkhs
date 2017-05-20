@@ -183,7 +183,7 @@ data Request = Request {
 
 requestCreateGet :: (MonadClient m s) => URL -> Cookies -> m (Either Error Request)
 requestCreateGet URL{..} Cookies{..} = do
-  case setUri def uri of
+  case setUri Client.defaultRequest uri of
     Left exc -> do
       return $ Left $ ErrorSetURL (URL uri) (show exc)
     Right r -> do
@@ -192,7 +192,6 @@ requestCreateGet URL{..} Cookies{..} = do
       return $ Right $ Request {
           req = r'{
               Client.redirectCount = 0
-            , Client.checkStatus = \_ _ _ -> Nothing
             },
           req_jar = jar
       }

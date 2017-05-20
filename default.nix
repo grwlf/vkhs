@@ -9,7 +9,7 @@ let
       , directory, filepath, http-client, http-client-tls, http-types
       , mtl, network-uri, optparse-applicative, parsec, pipes, pipes-http
       , pretty-show, regexpr, split, stdenv, taglib, tagsoup, text, time
-      , utf8-string, vector, cabal-install, zlib
+      , utf8-string, vector, cabal-install, zlib, haskdogs, hasktags
       }:
       mkDerivation {
         pname = "VKHS";
@@ -25,7 +25,8 @@ let
           parsec pipes pipes-http pretty-show split taglib tagsoup time
           utf8-string vector cabal-install zlib
         ];
-        executableHaskellDepends = [ regexpr text ];
+        executableHaskellDepends = [ regexpr text haskdogs ];
+        executableToolDepends = [ haskdogs hasktags ];
         doHaddock = false;
         homepage = "http://github.com/grwlf/vkhs";
         description = "Provides access to Vkontakte social network via public API";

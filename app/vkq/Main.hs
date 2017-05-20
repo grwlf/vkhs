@@ -18,6 +18,7 @@ import Data.Text.IO(putStrLn, hPutStrLn)
 import qualified Data.Text.IO as Text
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
+import Data.Monoid((<>))
 import Options.Applicative
 import qualified Sound.TagLib as TagLib
 import System.Environment
