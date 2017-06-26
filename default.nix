@@ -1,4 +1,6 @@
-{ nixpkgs ? import <nixpkgs> {}, compiler ? "ghc7103" }:
+{ nixpkgs ? import <nixpkgs> {},
+  compiler ? "ghc7103",
+  force_build ? false }:
 
 let
 
@@ -13,7 +15,7 @@ let
       }:
       mkDerivation {
         pname = "VKHS";
-        version = "1.7.2";
+        version = "1.7.3";
         src = ./.;
         isLibrary = true;
         isExecutable = true;
@@ -45,4 +47,4 @@ let
 
 in
 
-  if pkgs.lib.inNixShell then (drv f).env else (drv f)
+  if !force_build && pkgs.lib.inNixShell then (drv f).env else (drv f)
