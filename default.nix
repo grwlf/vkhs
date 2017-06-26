@@ -1,12 +1,12 @@
 { nixpkgs ? import <nixpkgs> {},
-  compiler ? "ghc7103",
+  ghc ? "ghc7103",
   force_build ? false }:
 
 let
 
   inherit (nixpkgs) pkgs;
 
-  f = { mkDerivation, aeson, aeson-pretty, base, bytestring
+  vkhs = { mkDerivation, aeson, aeson-pretty, base, bytestring
       , case-insensitive, clock, containers, data-default-class
       , directory, filepath, http-client, http-client-tls, http-types
       , mtl, network-uri, optparse-applicative, parsec, pipes, pipes-http
@@ -39,12 +39,9 @@ let
         '';
       };
 
-  haskellPackages = if compiler == "default"
-                       then pkgs.haskellPackages
-                       else pkgs.haskell.packages.${compiler};
-
-  drv = p : haskellPackages.callPackage p {};
+  drv = p : pkgs.haskell.packages.${ghc}.callPackage p {};
 
 in
 
-  if !force_build && pkgs.lib.inNixShell then (drv f).env else (drv f)
+  if !force_build && pkgs.lib.inNixShell then (drv vkhs).env else (drv vkhs)
+
