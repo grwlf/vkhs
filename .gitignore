@@ -8,3 +8,4 @@ MyApp.hs
 .cabal-sandbox
 tags
 latest.html
+.*
