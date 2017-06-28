@@ -6,3 +6,5 @@ cabal-dev
 *.chs.h
 MyApp.hs
 .cabal-sandbox
+tags
+latest.html
