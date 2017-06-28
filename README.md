@@ -1,16 +1,32 @@
 VKHS
 ====
 
-VKHS provides access to [Vkontakte][1] social network, popular mainly in Russia.
-Library can be used to login into the network as a standalone application (OAuth
-implicit flow as they call it). Having the access token, it is possible to call
-various API methods to query audio files or retrieve wall messages. For now,
-vkhs offers limited error detection and no captcha support.
+VKHS provides access to [Vkontakte](http://vk.com) social network, popular
+mainly in Russia.  Library can be used to login into the network as a standalone
+application (OAuth implicit flow as they call it). Having the access token, it
+is possible to call various API methods to query audio files or retrieve wall
+messages. For now, vkhs offers limited error detection and no captcha support.
+
+Features
+========
+
+* Provide access to VK API. Interface options include: VK monad and `vkq` command
+  line tool.
+* Connection uses HTTPS protocol
+* Automatic login form solving, may be used to operate on new/disposable
+  accounts.
+* The VK monad is designed as an interruptable coroutine. Default superwiser
+  supports ondemand re-login and may be used for long-running tasks.
+* Project includes a set of simplified API wrappers which are designed to be
+  copied into `runhaskell` script and tweaked according to user needs.
 
 Installing
 ==========
 
-In order to install VKHS, type:
+Installing from Cabal
+---------------------
+
+In order to install VKHS, one typically should do the following
 
     $ cabal update
     $ cabal install VKHS
@@ -18,8 +34,39 @@ In order to install VKHS, type:
 Note, that VKHS uses curlhs and should be linked with libcurl.so. Normally,
 cabal handles it without problems.
 
-VKQ
-===
+
+Installing from source
+----------------------
+
+    $ git clone https://github.com/grwlf/vkhs
+    $ cd vkhs
+    $ cabal install
+
+Developing using Nix
+--------------------
+
+We use [Nix](http://nixos.org) as a main development platform. In order to open
+development environment, do the following:
+
+    $ git clone https://github.com/grwlf/vkhs
+    $ cd vkhs
+    $ nix-shell
+    $ ...
+    $ ghci -isrc:app/vkq:app/common
+    $ cabal build
+
+Building ctags file
+-------------------
+
+./mktags.sh script may be used to build ctags file. It used `haskdogs` tool,
+which should be installed from Hackage.
+
+    $ haskdogs
+
+
+
+VKQ command line application
+============================
 
 VKQ is a command line tool which demonstrates API usage. It can be used for
 logging in, downloading music and reading wall messages.
@@ -67,7 +114,7 @@ For example, lets call ausio.search method to get some Beatles records:
     ...
 
 
-VKHS library/Runhaskell mode
+VKHS library/runhaskell mode
 ============================
 
 Starting from 1.7.2 there are initial support for RunHaskell-mode. Consider the
@@ -99,8 +146,8 @@ Debugging
 data, but the form appears again. Typically, that means that the password wa
 invalid or captcha is required.
 
-Limitations
-===========
+References
+==========
 * Implicit-flow authentication, see
   [documentation in Russian](http://vk.com/developers.php?oid=-1&p=Авторизация_клиентских_приложений)
   for details
@@ -112,6 +159,4 @@ License
 BSD3 license
 
 Copyright (c) 2014, Sergey Mironov <grrwlf@gmail.com>
-
-[1]: http://vk.com
 
