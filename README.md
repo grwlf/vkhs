@@ -53,20 +53,29 @@ Installing from source
 Developing using Nix
 --------------------
 
-We use [Nix](http://nixos.org) as a main development platform. In order to open
-development environment, do the following:
+The author of this project uses [Nix](http://nixos.org) as a main development
+platform. Typical development procedure includes the following steps:
 
     $ git clone https://github.com/grwlf/vkhs
     $ cd vkhs
+    $
     $ nix-shell
-    $ ...
+
+      .. Entering Nix shell environment
+
     $ ghci -isrc:app/vkq:app/common
-    $ cabal build
+    $ exit
+
+      ..  Now exiting from the Nix shell
+
+    $ nix-build
+
+The `default.nix` file contain Nix expression describing the environment
 
 Building ctags file
 -------------------
 
-./mktags.sh script may be used to build ctags file. It used `haskdogs` tool,
+`./mktags.sh` script may be used to build ctags file. It used `haskdogs` tool,
 which should be installed from Hackage.
 
     $ haskdogs
@@ -76,8 +85,9 @@ which should be installed from Hackage.
 VKQ command line application
 ============================
 
-VKQ is a command line tool which demonstrates API usage. It can be used for
-logging in, downloading music and reading wall messages.
+`vkq` is a command line tool which demonstrates API usage. It can be used for
+logging in, downloading music and reading wall messages. Call `vkq --help` or
+`vkq --help [command]` to read online help.
 
 
 Log in to VK
@@ -88,9 +98,9 @@ Here is an example session: Login first
     $ vkq login user@mail.org pass123
     d8a41221616ef5ba19537125dc0349bad9d529fa15314ad765911726fe98b15185ac41a7ca2c62f3bf4b9
 
-VKQ returns three values. First is a access token which is required to execute
-future API requests. VKQ reads it from VKQ\_ACCESS\_TOKEN environment variable so
-we have to set it up
+VKQ returns three values. First one is an access token required to execute all
+API requests. `vkq` tries to reads it from `VKQ_ACCESS_TOKEN` environment variable or
+from `.vkhs-access-token` file (may be changed using options).
 
     $ export VKQ_ACCESS_TOKEN=d785932b871f096bd73aac6a35d7a7c469dd788d796463a871e5beb5c61bc6c96788ec2
 
@@ -101,6 +111,9 @@ VKQ may cache the access tokein into a state file:
     .. VKQ will ask for email/password and cache the access token
 
     $ vkq call groups.search q=Beatles --pretty --access-token-file=.access-token
+
+Latest versions of the library have `--access-token-flag` option enabled by
+default. Set it to empty value to disable the caching feature.
 
 
 Performing custom API calls
@@ -134,7 +147,7 @@ For example, lets call ausio.search method to get some Beatles records:
 VKHS library/runhaskell mode
 ============================
 
-Starting from 1.7.2 there are initial support for RunHaskell-mode. Consider the
+Starting from 1.7.2 the library supports RunHaskell-mode. Consider the
 following example:
 
 
@@ -151,17 +164,16 @@ following example:
       forM_ cs $ \Country{..} -> do
         liftIO $ putStrLn co_title
 
-When executed, the program should ask for login and password and output list of
-countries known to VK. Consider reviewing  Web.VKHS.API.Simple where
-`getCountries` and several other methods are defined. Also, check the source
-code of the `vkq` application for more elaborated usage example.
+When executed, the program asks for login/password and outputs list of countries
+known to VK.  `getCountries` and several other methods are defined in
+`Web.VKHS.API.Simple`. `vkq` application may be used as a more elaborated
+example.
 
 Debugging
 =========
 
-`RepatedForm` message means that VKHS tries to fill the web form with available
-data, but the form appears again. Typically, that means that the password wa
-invalid or captcha is required.
+Verbosity may be increased using `--verbose` flag or `o_verbose` field of
+`GenericOptions`. Login automata saves `latest.html` file during operation.
 
 References
 ==========
