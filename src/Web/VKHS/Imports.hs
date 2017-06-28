@@ -47,7 +47,9 @@ import Data.Function (on)
 import Data.Text (Text(..), pack, unpack)
 import Data.Text.IO (putStrLn, hPutStrLn)
 import Data.List (head, length, sortBy, (++))
-import Prelude (Integer, FilePath, (==), (.), Show(..), String, ($), IO(..), Bool(..), compare, Ordering(..))
+import Prelude (error, Integer, FilePath, (==), (.), Show(..), String,
+                ($), IO(..), Bool(..), compare, Ordering(..),
+                Read(..))
 import Text.Printf
 import Text.Show.Pretty
 import Text.Read (readMaybe)

@@ -148,7 +148,7 @@ apiR m0 args0 = go (ReExec m0 args0) where
         ReParse j -> do
           pure j
     case parseJSON j of
-      (Right a) -> return a
+      (Right (Response _ a)) -> return a
       (Left e) -> do
         recovery <- raise (CallFailure (m0, args0, j, e))
         go recovery

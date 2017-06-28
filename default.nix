@@ -11,7 +11,7 @@ let
       , directory, filepath, http-client, http-client-tls, http-types
       , mtl, network-uri, optparse-applicative, parsec, pipes, pipes-http
       , pretty-show, regexpr, split, stdenv, taglib, tagsoup, text, time
-      , utf8-string, vector, cabal-install, zlib, haskdogs, hasktags
+      , utf8-string, vector, cabal-install, zlib, haskdogs, hasktags, scientific
       }:
       mkDerivation {
         pname = "VKHS";

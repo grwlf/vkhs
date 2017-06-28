@@ -101,6 +101,9 @@ newtype AppID = AppID { aid_string :: String }
 data JSON = JSON { js_aeson :: Aeson.Value }
   deriving(Show, Data, Typeable)
 
+instance FromJSON JSON where
+  parseJSON v = return $ JSON v
+
 parseJSON :: (Aeson.FromJSON a) => JSON -> Either String a
 parseJSON j = Aeson.parseEither Aeson.parseJSON (js_aeson j)
 

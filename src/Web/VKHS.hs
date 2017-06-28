@@ -151,8 +151,9 @@ defaultSuperviser = go where
                 go (k $ ReExec m args)
               ErrorCode ec -> do
                 alert $  "Unhandled error code " <> tshow ec <> "\n"
-                      <> "Consider improving the 'defaultSuperwiser' or using \n"
-                      <> "`apiH` / `apiHS` with custom error handlers"
+                      <> "Consider improving 'defaultSuperwiser' or applying \n"
+                      <> "custom error filters using `apiH` ,`apiHS` or their \n"
+                      <> "high-level wrappers `apiSimpleH` / `apiSimpleHM`"
                 lift $ throwError res_desc
 
       _ -> do

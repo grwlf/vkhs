@@ -50,7 +50,7 @@ import Web.VKHS.API.Types
 max_count = 1000
 ver = "5.44"
 
-apiSimple nm args = resp_data <$> apiR nm (("v",ver):args)
+apiSimple nm args = apiR nm (("v",ver):args)
 apiSimpleH nm args handler = apiH nm (("v",ver):args) handler
 apiSimpleHM nm args handler = apiHM nm (("v",ver):args) handler
 apiVer nm args = api nm (("v",ver):args)
