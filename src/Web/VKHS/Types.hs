@@ -98,6 +98,9 @@ newtype AppID = AppID { aid_string :: String }
   deriving(Show, Eq, Ord)
 
 
+-- | JSON wrapper.
+--
+-- * FIXME  Implement full set of helper functions
 data JSON = JSON { js_aeson :: Aeson.Value }
   deriving(Show, Data, Typeable)
 
