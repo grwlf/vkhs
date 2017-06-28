@@ -170,7 +170,9 @@ apiHM m0 args0 handler = go (ReExec m0 args0) where
         ReParse j -> do
           pure j
     case (parseJSON j, parseJSON j) of
-      (Right (Response _ a), _) -> return a
+      (Left e1, Left e2) -> do
+        recovery <- raise (CallFailure (m0, args0, j, e1 <> ";" <> e2))
+        go recovery
       (Left e, Right (Response _ err)) -> do
         ma <- (handler err)
         case ma of
@@ -178,9 +180,16 @@ apiHM m0 args0 handler = go (ReExec m0 args0) where
           Nothing -> do
             recovery <- raise (CallFailure (m0, args0, j, e))
             go recovery
-      (Left e1, Left e2) -> do
-        recovery <- raise (CallFailure (m0, args0, j, e1 <> ";" <> e2))
-        go recovery
+      (Right _, Right (Response _ err)) -> do
+        ma <- (handler err)
+        case ma of
+          Just a -> return a
+          Nothing -> do
+            recovery <- raise (CallFailure (m0, args0, j,
+              "Response matches both error and result object"))
+            go recovery
+      (Right (Response _ a), _) -> do
+        return a
 
 apiH :: forall m x a s . (Aeson.FromJSON a, MonadAPI m x s)
     => MethodName -- ^ API method name

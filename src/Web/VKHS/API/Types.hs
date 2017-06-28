@@ -124,6 +124,9 @@ instance FromJSON ErrorRecord where
       <$> (o .: "error_code")
       <*> (o .: "error_msg")
 
+-- | Wall post representation (partial)
+--
+-- See also https://vk.com/dev/objects/post
 data WallRecord = WallRecord
   { wr_id :: Int
   , wr_from_id :: Int
