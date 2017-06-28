@@ -15,7 +15,7 @@ let
       }:
       mkDerivation {
         pname = "VKHS";
-        version = "1.7.3";
+        version = "1.8";
         src = ./.;
         isLibrary = true;
         isExecutable = true;
