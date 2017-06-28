@@ -101,7 +101,7 @@ setUserPhoto UserRecord{..} photo_path =  do
       [("owner_id", tshow ur_id)]
   req <- ensure $ requestUploadPhoto ous_upload_url photo
   (res, _) <- requestExecute req
-  j@JSON{..} <- parseJSON (responseBody res)
+  j@JSON{..} <- decodeJSON (responseBody res)
   liftIO $ putStrLn $ (responseBodyS res)
   UploadRecord{..} <-
     case Aeson.parseEither Aeson.parseJSON js_aeson of

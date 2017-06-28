@@ -92,6 +92,8 @@ opts m =
         <*> ppass
         <*> strOption (short 'a' <> m <> metavar "ACCESS_TOKEN" <>
               help ("Access token. Honores " ++ env_access_token ++ " environment variable"))
+        <*> strOption (long "access-token-file" <> value "" <> metavar "FILE" <>
+              help ("Filename to store actual access token, should be used to pass its value between sessions"))
 
       genericOptions = genericOptions_
         (strOption (value "" <> long "user" <> metavar "USER" <> help "User name or email"))

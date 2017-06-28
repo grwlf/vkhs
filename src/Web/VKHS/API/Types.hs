@@ -33,8 +33,7 @@ import Web.VKHS.Types
 data Response a = Response {
     resp_json :: JSON
   , resp_data :: a
-  }
-  deriving (Show, Data, Typeable)
+  } deriving (Show, Data, Typeable)
 
 emptyResponse :: (Monoid a) => Response a
 emptyResponse = Response (JSON $ Aeson.object []) mempty
@@ -45,7 +44,7 @@ parseJSON_obj_error name o = fail $
 
 instance (FromJSON a) => FromJSON (Response a) where
   parseJSON j = Aeson.withObject "Response" (\o ->
-    Response <$> pure (JSON j) <*> (o .: "response")) j
+    Response <$> pure (JSON j) <*> (o .: "error" <|> o .: "response")) j
 
 -- | DEPRECATED, use @Sized@ instead
 data SizedList a = SizedList Int [a]

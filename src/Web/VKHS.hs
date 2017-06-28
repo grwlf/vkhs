@@ -44,7 +44,7 @@ import Web.VKHS.Monad hiding (catch)
 import qualified Web.VKHS.Monad as VKHS
 import Web.VKHS.Login (MonadLogin, LoginState(..), ToLoginState(..), printForm, login)
 import qualified Web.VKHS.Login as Login
-import Web.VKHS.API.Base (MonadAPI, APIState(..), ToAPIState(..), api)
+import Web.VKHS.API.Base (MonadAPI, APIState(..), ToAPIState(..), api, readInitialAccessToken, modifyAccessToken)
 import qualified Web.VKHS.API.Base as API
 import Web.VKHS.API.Types
 import Web.VKHS.API.Simple
@@ -111,9 +111,11 @@ defaultSuperviser = go where
     case res of
       Fine a -> do
         return a
+
       UnexpectedInt e k -> do
         alert "UnexpectedInt (ignoring)"
         go (k 0)
+
       UnexpectedFormField (Form tit f) i k -> do
         alert $ "While filling form " <> (printForm "" f)
         case o_allow_interactive of
@@ -125,16 +127,32 @@ defaultSuperviser = go where
           False -> do
             alert $ "Unable to query value for " <> tpack i <> " since interactive mode is disabled"
             lift $ throwError res_desc
+
       LogError text k -> do
         alert text
         go (k ())
+
       CallFailure (m, args, j, err) k -> do
         alert $    "Error calling API:\n\n\t" <> tshow m <> " " <> tshow args <> "\n"
               <> "\nResponse object:\n\n\t" <> tshow j <> "\n"
               <> "\nParser error was:" <> tshow err <> "\n"
-        -- lift $ throwError res_desc
-        modify $ modifyAPIState (\as -> as{api_access_token = init (api_access_token as)})
-        go (k $ ReExec m args)
+
+        case parseJSON j of
+          Left err -> do
+            alert $ "Failed to parse JSON error object, message: " <> tshow err
+            lift $ throwError res_desc
+
+          Right (Response _ ErrorRecord{..}) -> do
+            case er_code of
+              5 -> do
+                alert $ "Attempting to re-login"
+                at <- defaultSuperviser (login >>= return . Fine)
+                modifyAccessToken at
+                go (k $ ReExec m args)
+              ec -> do
+                alert $ "Unknown error code " <> tshow ec
+                lift $ throwError res_desc
+
       _ -> do
         alert $ "Unsupervised error: " <> res_desc
         lift $ throwError res_desc
@@ -149,13 +167,15 @@ runAPI :: Show b => GenericOptions -> VK (R VK b) b -> ExceptT Text IO b
 runAPI go@GenericOptions{..} m = do
   s <- initialState go
   flip evalStateT s $ do
-  case (null l_access_token) of
-    True -> do
-      AccessToken{..} <- defaultSuperviser (login >>= return . Fine)
-      modify $ modifyAPIState (\as -> as{api_access_token = at_access_token <> "x"})
-    False -> do
-      modify $ modifyAPIState (\as -> as{api_access_token = l_access_token})
-  defaultSuperviser (m >>= return . Fine)
+
+    at <- readInitialAccessToken >>= \case
+      Nothing ->
+        defaultSuperviser (login >>= return . Fine)
+      Just at ->
+        pure at
+
+    modifyAccessToken at
+    defaultSuperviser (m >>= return . Fine)
 
 runVK :: Show a => GenericOptions -> VK (R VK a) a -> IO (Either Text a)
 runVK go = runExceptT . runAPI go

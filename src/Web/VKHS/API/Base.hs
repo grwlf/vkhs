@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -20,6 +21,7 @@ import Control.Monad
 import Control.Monad.State
 import Control.Monad.Writer
 import Control.Monad.Cont
+import Control.Exception (catch, SomeException)
 
 import Data.Text(Text)
 import qualified Data.Text as Text
@@ -34,6 +36,7 @@ import qualified Data.Aeson.Types as Aeson
 import qualified Data.Aeson.Encode.Pretty as Aeson
 
 import Text.Printf
+import Text.Read (readMaybe)
 
 import Web.VKHS.Types
 import Web.VKHS.Client hiding (Response(..))
@@ -55,6 +58,47 @@ class ToGenericOptions s => ToAPIState s where
   toAPIState :: s -> APIState
   modifyAPIState :: (APIState -> APIState) -> (s -> s)
 
+getGenericOptions :: (MonadState s m, ToGenericOptions s) => m GenericOptions
+getGenericOptions = gets toGenericOptions
+
+-- | Read the access token according with respect to user-defined parameters
+readInitialAccessToken :: (MonadIO m, MonadState s m, ToAPIState s) => m (Maybe AccessToken)
+readInitialAccessToken =
+  let
+    str2at s = Just (AccessToken s "<unknown>" "<unknown>")
+
+    safeReadFile fn = do
+      liftIO $ Control.Exception.catch (Just <$> readFile fn) (\(e :: SomeException) -> return Nothing)
+
+  in do
+  GenericOptions{..} <- getGenericOptions
+  case l_access_token of
+   [] -> do
+    case l_access_token_file of
+      [] -> return Nothing
+      fl -> do
+        safeReadFile l_access_token_file >>= \case
+          Just txt -> do
+            case readMaybe txt of
+              Just at -> return (Just at)
+              Nothing -> return (str2at txt)
+          Nothing -> do
+            return Nothing
+   _ -> do
+    return (str2at l_access_token)
+
+
+-- | Modifies VK access token in the internal state as well as in the external
+-- storage, if enabled
+modifyAccessToken :: (MonadIO m, MonadState s m, ToAPIState s) => AccessToken -> m ()
+modifyAccessToken at@AccessToken{..} = do
+  modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
+  GenericOptions{..} <- getGenericOptions
+  case l_access_token_file of
+    [] -> return ()
+    fl -> liftIO $ writeFile l_access_token_file (show at)
+  return ()
+
 -- | Class of monads able to run VK API calls. @m@ - the monad itself, @x@ -
 -- type of early error, @s@ - type of state (see alse @ToAPIState@)
 class (MonadIO (m (R m x)), MonadClient (m (R m x)) s, ToAPIState s, MonadVK (m (R m x)) (R m x)) =>
@@ -63,10 +107,12 @@ class (MonadIO (m (R m x)), MonadClient (m (R m x)) s, ToAPIState s, MonadVK (m 
 type API m x a = m (R m x) a
 
 -- | Utility function to parse JSON object
-parseJSON :: (MonadAPI m x s)
+--
+-- FIXME * Don't raise exception, simply return `Left err`
+decodeJSON :: (MonadAPI m x s)
     => ByteString
     -> API m x JSON
-parseJSON bs = do
+decodeJSON bs = do
   case Aeson.decode (fromStrict bs) of
     Just js -> return (JSON js)
     Nothing -> raise (JSONParseFailure bs)
@@ -104,7 +150,7 @@ apiJ mname (map (id *** tunpack) -> margs) = do
 
   req <- ensure (requestCreateGet url (cookiesCreate ()))
   (res, jar') <- requestExecute req
-  parseJSON (responseBody res)
+  decodeJSON (responseBody res)
 
 
 -- | Invoke the request, return answer as a Haskell datatype. On error fall out
@@ -117,8 +163,8 @@ api :: (Aeson.FromJSON a, MonadAPI m x s)
     -- ^ API method arguments
     -> API m x a
 api m args = do
-  j@JSON{..} <- apiJ m args
-  case Aeson.parseEither Aeson.parseJSON js_aeson of
+  j <- apiJ m args
+  case parseJSON j of
     Right a -> return a
     Left e -> terminate (JSONParseFailure' j e)
 
@@ -130,13 +176,13 @@ apiR :: (Aeson.FromJSON a, MonadAPI m x s)
     -> API m x a
 apiR m0 args0 = go (ReExec m0 args0) where
   go action = do
-    j@JSON{..} <- do
+    j <- do
       case action of
         ReExec m args -> do
           apiJ m args
         ReParse j -> do
           pure j
-    case Aeson.parseEither Aeson.parseJSON js_aeson of
+    case parseJSON j of
       (Right a) -> return a
       (Left e) -> do
         recovery <- raise (CallFailure (m0, args0, j, e))
@@ -149,9 +195,9 @@ apiE :: (Aeson.FromJSON a, MonadAPI m x s)
     -> [(String, Text)] -- ^ API method arguments
     -> API m x (Either (Response ErrorRecord) a)
 apiE m args = apiJ m args >>= convert where
-  convert j@JSON{..} = do
-    err <- pure $ Aeson.parseEither Aeson.parseJSON js_aeson
-    ans <- pure $ Aeson.parseEither Aeson.parseJSON js_aeson
+  convert j = do
+    err <- pure $ parseJSON j
+    ans <- pure $ parseJSON j
     case  (ans, err) of
       (Right a, _) -> return (Right a)
       (Left a, Right e) -> return (Left e)

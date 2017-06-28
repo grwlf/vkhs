@@ -34,11 +34,13 @@ tshow = tpack . show
 --
 -- See http://vk.com/developers.php?oid=-1&p=Авторизация_клиентских_приложений
 -- (in Russian) for more details
+--
+-- See also `modifyAccessToken` and `readInitialAccessToken`
 data AccessToken = AccessToken {
     at_access_token :: String
   , at_user_id :: String
   , at_expires_in :: String
-  } deriving(Show, Eq, Ord)
+  } deriving(Read, Show, Eq, Ord)
 
 -- | Access rigth to request from VK.
 -- See API docs http://vk.com/developers.php?oid=-1&p=Права_доступа_приложений (in
@@ -99,6 +101,9 @@ newtype AppID = AppID { aid_string :: String }
 data JSON = JSON { js_aeson :: Aeson.Value }
   deriving(Show, Data, Typeable)
 
+parseJSON :: (Aeson.FromJSON a) => JSON -> Either String a
+parseJSON j = Aeson.parseEither Aeson.parseJSON (js_aeson j)
+
 data Form = Form {
     form_title :: String
   , form :: Shpider.Form
@@ -110,6 +115,8 @@ data FilledForm = FilledForm {
   } deriving(Show)
 
 
+-- | Generic parameters of the VK execution. For accessing from VK runtime, use
+-- `getGenericOptions` function
 data GenericOptions = GenericOptions {
     o_login_host :: String
   , o_api_host :: String
@@ -122,10 +129,16 @@ data GenericOptions = GenericOptions {
 
   , l_appid :: AppID
   , l_username :: String
-  -- ^ Empty string means no value is given
+  -- ^ VK user name, (typically, an email). Empty string means no value is given
   , l_password :: String
-  -- ^ Empty string means no value is given
+  -- ^ VK password. Empty string means no value is given
+  -- FIXME: Hide plain-text passwords
   , l_access_token :: String
+  -- ^ Initial access token, empty means 'not set'. Has higher precedence than
+  -- l_access_token_file
+  , l_access_token_file :: FilePath
+  -- ^ Filename to store actual access token, should be used to pass its value
+  -- between sessions
   } deriving(Show)
 
 defaultOptions = GenericOptions {
@@ -139,10 +152,9 @@ defaultOptions = GenericOptions {
 
   , l_appid  = AppID "3128877"
   , l_username = ""
-  -- ^ Empty string means no value is given
   , l_password = ""
-  -- ^ Empty string means no value is given
   , l_access_token = ""
+  , l_access_token_file = ""
   }
 
 class ToGenericOptions s where
