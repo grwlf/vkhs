@@ -19,6 +19,7 @@ import Control.Monad.Cont
 import Control.Exception (catch, SomeException)
 
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 import Data.ByteString.Lazy (fromStrict,toChunks)
 import qualified Data.ByteString.Char8 as BS
 
@@ -224,9 +225,15 @@ api_S :: (Aeson.FromJSON a, MonadAPI m x s)
 api_S m args = api m (map (id *** tpack) args)
 
 -- Encode JSON back to string
-jsonEncode :: JSON -> ByteString
-jsonEncode JSON{..} = BS.concat $ toChunks $ Aeson.encode js_aeson
+jsonEncodeBS :: JSON -> ByteString
+jsonEncodeBS JSON{..} = BS.concat $ toChunks $ Aeson.encode js_aeson
 
-jsonEncodePretty :: JSON -> ByteString
-jsonEncodePretty JSON{..} = BS.concat $ toChunks $ Aeson.encodePretty js_aeson
+jsonEncode :: JSON -> Text
+jsonEncode JSON{..} = Text.decodeUtf8 $ BS.concat $ toChunks $ Aeson.encode js_aeson
+
+jsonEncodePrettyBS :: JSON -> ByteString
+jsonEncodePrettyBS JSON{..} = BS.concat $ toChunks $ Aeson.encodePretty js_aeson
+
+jsonEncodePretty :: JSON -> Text
+jsonEncodePretty JSON{..} = Text.decodeUtf8 $ BS.concat $ toChunks $ Aeson.encodePretty js_aeson
 

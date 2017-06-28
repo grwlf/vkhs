@@ -3,7 +3,7 @@
 -- function from this module into their 'runhaskell' script and customize
 -- as required.
 --
--- Runhaskell script may look like the following:
+-- Runhaskell script may looks like the following:
 -- @
 --     #!/usr/bin/env runhaskell
 --     {-# LANGUAGE RecordWildCards #-}
@@ -87,6 +87,7 @@ getCities Country{..} mq =
     ] ++
     maybe [] (\q -> [("q",q)]) mq
 
+-- | See [https://vk.com/dev/wall.get]
 getGroupWall :: forall m x s . (MonadAPI m x s) => GroupRecord -> API m x (Sized [WallRecord])
 getGroupWall GroupRecord{..} =
   apiSimpleHM "wall.get"

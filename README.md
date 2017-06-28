@@ -12,13 +12,21 @@ Features
 
 * Provide access to VK API. Interface options include: VK monad and `vkq` command
   line tool.
-* Connection uses HTTPS protocol
-* Automatic login form solving, may be used to operate on new/disposable
-  accounts.
-* The VK monad is designed as an interruptable coroutine. Default superwiser
-  supports ondemand re-login and may be used for long-running tasks.
-* Project includes a set of simplified API wrappers which are designed to be
-  copied into `runhaskell` script and tweaked according to user needs.
+* Use HTTPS protocol.
+* Solve login form interaction, may be used to operate new/disposable VK accounts.
+* VK monad is an interruptable coroutine. The superwiser supports ondemand
+  re-login, and may be used for long-running tasks.
+* Project includes a set of `Web.VKHS.API.Simple` wrappers designed to be
+  copied into `runhaskell` scripts and tweaked according to ones need.
+
+Issues
+======
+
+* Still no support for captchas, one probably should hack `defaultSuperwiser`
+  and add them
+* Network connection timeout is not handled by superwiser
+* Minor issues here and there. Use `git grep FIXME` to find them
+* File uploading still not functioning
 
 Installing
 ==========

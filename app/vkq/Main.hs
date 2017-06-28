@@ -202,9 +202,9 @@ cmd (API go APIOptions{..}) = do
     x <- apiJ a_method (map (id *** tpack) $ splitFragments "," "=" a_args)
     if a_pretty
       then do
-        liftIO $ BS.putStrLn $ jsonEncodePretty x
+        liftIO $ putStrLn $ jsonEncodePretty x
       else
-        liftIO $ BS.putStrLn $ jsonEncode x
+        liftIO $ putStrLn $ jsonEncode x
   return ()
 
 cmd (Music go@GenericOptions{..} mo@MusicOptions{..}) = do

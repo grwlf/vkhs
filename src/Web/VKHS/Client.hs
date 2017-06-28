@@ -1,3 +1,4 @@
+-- | This module mainly contains HTTP wrappers required to operate VK monad
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -135,7 +136,7 @@ urlFromString s =
     Nothing -> Left (ErrorParseURL s "Client.parseURI failed")
     Just u -> Right (URL u)
 
--- | * FIXME Convert to BS
+-- | * FIXME Convert to ByteString /  Text
 splitFragments :: String -> String -> String -> [(String,String)]
 splitFragments sep eqs =
     filter (\(a, b) -> not (null a))
@@ -150,7 +151,7 @@ splitFragments sep eqs =
         trim = rev (dropWhile (`elem` (" \t\n\r" :: String)))
           where rev f = reverse . f . reverse . f
 
--- | * FIXME Convert to BS
+-- | * FIXME Convert to ByteString / Text
 urlFragments :: URL -> [(String,String)]
 urlFragments URL{..} = splitFragments "&" "=" $  unsharp $ Client.uriFragment uri where
   unsharp ('#':x) = x
@@ -183,6 +184,7 @@ data Request = Request {
   , req_jar :: Client.CookieJar
   }
 
+-- | Create HTTP(S) GET request
 requestCreateGet :: (MonadClient m s) => URL -> Cookies -> m (Either Error Request)
 requestCreateGet URL{..} Cookies{..} = do
   case setUri Client.defaultRequest uri of
@@ -199,6 +201,7 @@ requestCreateGet URL{..} Cookies{..} = do
           req_jar = jar
       }
 
+-- | Create HTTP(S) POST request
 requestCreatePost :: (MonadClient m s) => FilledForm -> Cookies -> m (Either Error Request)
 requestCreatePost (FilledForm tit Shpider.Form{..}) c = do
   case Client.parseURI (Client.escapeURIString Client.isAllowedInURI action) of
@@ -211,6 +214,11 @@ requestCreatePost (FilledForm tit Shpider.Form{..}) c = do
         Right Request{..} -> do
           return $ Right $ Request (Client.urlEncodedBody (map (BS.pack *** BS.pack) $ Map.toList inputs) req) req_jar
 
+-- | Upload the bytestring data @bs@ to the server @text_url@
+--
+-- * FIXME This function is not working. Looks like VK requires some other
+--   FIXME method rather than urlEncodedBody.
+-- * FIXME Use 'URL' rather than Text
 requestUploadPhoto :: (MonadClient m s) => Text -> ByteString -> m (Either Error Request)
 requestUploadPhoto text_url bs = do
   case Client.parseURI (Text.unpack text_url) of
@@ -260,6 +268,7 @@ responseOK :: Response -> Bool
 responseOK r = c == 200 where
   c = responseCode r
 
+-- | Execute the 'Request' created by 'requestCreatePost' or 'requestCreateGet'
 requestExecute :: (MonadClient m s) => Request -> m (Response, Cookies)
 requestExecute Request{..} = do
   jar <- pure req_jar
@@ -269,7 +278,8 @@ requestExecute Request{..} = do
     let interval_ns = toNanoSecs (clk `diffTimeSpec` cl_last_execute)
     when (interval_ns < cl_minimum_interval_ns) $ do
       when cl_verbose $ do
-        hPutStrLn stderr $ "Delaying execution to match the request threshold limit of " <> show cl_minimum_interval_ns <> " ns"
+        hPutStrLn stderr $  "Delaying execution to match the request threshold limit of "
+                         <> show cl_minimum_interval_ns <> " ns"
       threadDelay (fromInteger $ (cl_minimum_interval_ns - interval_ns) `div` 1000); -- convert ns to us
     return clk
 
@@ -282,6 +292,7 @@ requestExecute Request{..} = do
       let (jar', resp') = Client.updateCookieJar resp req now jar
       return (Response resp resp_body, Cookies jar')
 
+-- | Download helper
 downloadFileWith :: (MonadClient m s) => URL -> (ByteString -> IO ()) -> m ()
 downloadFileWith url h = do
   (ClientState{..}) <- toClientState <$> get
