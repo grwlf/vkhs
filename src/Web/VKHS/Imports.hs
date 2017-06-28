@@ -1,3 +1,4 @@
+-- | This module re-imports common declarations used across the VKHS
 module Web.VKHS.Imports (
     module Web.VKHS.Imports
   , module Control.Monad

@@ -96,6 +96,12 @@ instance MonadAPI VK r State
 stepVK :: VK r r -> StateT State (ExceptT Text IO) r
 stepVK m = runContT (runReaderT (unVK (VKHS.catch m)) undefined) return
 
+-- | Run VK monad @m@ and handle continuation requests with the default
+-- algorithm.
+--
+-- FIXME * implement re-login functionality
+-- FIXME * store known answers in external DB (in file?) instead of LoginState
+-- FIXME   dictionary
 defaultSuperviser :: (Show a) => VK (R VK a) (R VK a) -> StateT State (ExceptT Text IO) a
 defaultSuperviser = go where
   go m = do
@@ -103,7 +109,8 @@ defaultSuperviser = go where
     res <- stepVK m
     res_desc <- pure (describeResult res)
     case res of
-      Fine a -> return a
+      Fine a -> do
+        return a
       UnexpectedInt e k -> do
         alert "UnexpectedInt (ignoring)"
         go (k 0)
@@ -112,7 +119,7 @@ defaultSuperviser = go where
         case o_allow_interactive of
           True -> do
             v <- do
-              alert $ "Please, enter the correct value for input " <> tpack i <> " : "
+              alert $ "Please, enter the value for input " <> tpack i <> " : "
               liftIO $ getLine
             go (k v)
           False -> do
@@ -121,6 +128,13 @@ defaultSuperviser = go where
       LogError text k -> do
         alert text
         go (k ())
+      CallFailure (m, args, j, err) k -> do
+        alert $    "Error calling API:\n\n\t" <> tshow m <> " " <> tshow args <> "\n"
+              <> "\nResponse object:\n\n\t" <> tshow j <> "\n"
+              <> "\nParser error was:" <> tshow err <> "\n"
+        -- lift $ throwError res_desc
+        modify $ modifyAPIState (\as -> as{api_access_token = init (api_access_token as)})
+        go (k $ ReExec m args)
       _ -> do
         alert $ "Unsupervised error: " <> res_desc
         lift $ throwError res_desc
@@ -130,7 +144,7 @@ runLogin go = do
   s <- initialState go
   evalStateT (defaultSuperviser (login >>= return . Fine)) s
 
-
+-- | Run the API monad, attempt to login if required
 runAPI :: Show b => GenericOptions -> VK (R VK b) b -> ExceptT Text IO b
 runAPI go@GenericOptions{..} m = do
   s <- initialState go
@@ -138,7 +152,7 @@ runAPI go@GenericOptions{..} m = do
   case (null l_access_token) of
     True -> do
       AccessToken{..} <- defaultSuperviser (login >>= return . Fine)
-      modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
+      modify $ modifyAPIState (\as -> as{api_access_token = at_access_token <> "x"})
     False -> do
       modify $ modifyAPIState (\as -> as{api_access_token = l_access_token})
   defaultSuperviser (m >>= return . Fine)

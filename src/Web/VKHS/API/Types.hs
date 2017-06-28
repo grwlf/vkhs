@@ -45,7 +45,7 @@ parseJSON_obj_error name o = fail $
 
 instance (FromJSON a) => FromJSON (Response a) where
   parseJSON j = Aeson.withObject "Response" (\o ->
-    Response <$> pure (JSON j) <*> (o .: "response" <|> o.: "error")) j
+    Response <$> pure (JSON j) <*> (o .: "response")) j
 
 -- | DEPRECATED, use @Sized@ instead
 data SizedList a = SizedList Int [a]

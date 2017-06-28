@@ -39,6 +39,7 @@ import Util
 
 env_access_token = "VKQ_ACCESS_TOKEN"
 
+-- | Options to query VK database
 data DBOptions = DBOptions {
     db_countries :: Bool
   , db_cities :: Bool

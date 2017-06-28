@@ -185,6 +185,7 @@ requestCreateGet URL{..} Cookies{..} = do
   case setUri Client.defaultRequest uri of
     Left exc -> do
       return $ Left $ ErrorSetURL (URL uri) (show exc)
+
     Right r -> do
       now <- liftIO getCurrentTime
       (r',_) <- pure $ Client.insertCookiesIntoRequest r jar now

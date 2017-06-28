@@ -13,12 +13,23 @@ import Data.Monoid ((<>))
 data Error = ETimeout | EClient Client.Error
   deriving(Show, Eq)
 
--- | Alias for Result
+-- | Message type used by the Superwiser to comminicatre with VK program
+data CallRecovery =
+    ReExec MethodName MethodArgs
+  -- ^ VK program is to re-execute the method with the given parameters
+  | ReParse JSON
+  -- ^ VK program is to re-parse the JSON as if it was the result of API call in
+  -- question
+  deriving(Show)
+
+-- | Alias for `Result`
 type R t a = Result t a
 
 -- | Result with continuation. @t@ represents the continuation monad, which
 -- needs to track two types: the 'early break' type and the 'current result'
 -- type. In the end both types are the same.
+--
+-- FIXME: re-implement the concept using `Monad.Free` library
 data Result t a =
     Fine a
   -- ^ The normal exit of a computation
@@ -41,6 +52,7 @@ data Result t a =
   -- ^ Failed to convert JSON into Haskell object, Text describes an error.
   -- Superwiser may wish to replace the JSON with the correct one
   | LogError Text (() -> t (R t a) (R t a))
+  | CallFailure (MethodName, MethodArgs, JSON, String) (CallRecovery -> t (R t a) (R t a))
 
 data ResultDescription a =
     DescFine a
@@ -59,4 +71,5 @@ describeResult (JSONParseFailure bs _) = "JSONParseFailure " <> (tshow bs)
 describeResult (JSONParseFailure' JSON{..} s) = "JSONParseFailure' " <> (tshow s) <> " JSON: " <> (tpack $ take 1000 $ show js_aeson)
 describeResult (LogError t k) = "LogError " <> (tshow t)
 describeResult (JSONCovertionFailure j k) = "JSONConvertionFailure " <> (tshow j)
+describeResult (CallFailure (n,args,j,err) k) = "CallFailure " <> tshow n <> " " <> tshow args
 

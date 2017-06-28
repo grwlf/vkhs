@@ -40,8 +40,9 @@ getCountries :: (MonadAPI m x s) => API m x (Sized [Country])
 getCountries =
   fmap (sortBy (compare `on` co_title)) <$> do
   resp_data <$> do
-  apiSimple emptyResponse "database.getCountries" $
-    [("need_all", "1"),
+  apiR "database.getCountries" $
+    [("v",ver),
+     ("need_all", "1"),
      ("count", tpack (show max_count))
     ]
 

@@ -175,3 +175,6 @@ data GroupOptions = GroupOptions {
   , g_output_format :: String
   } deriving(Show)
 
+type MethodName = String
+type MethodArgs = [(String, Text)]
+

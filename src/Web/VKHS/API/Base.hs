@@ -77,9 +77,9 @@ parseJSON bs = do
 -- <https://vk.com/dev/methods>
 -- <https://vk.com/dev/json_schema>
 --
--- FIXME: We currentyl use Text.unpack to encode text into strings. Use encodeUtf8
--- instead.
--- FIXME: Split into request builder and request executer
+-- FIXME * We currentyl use Text.unpack to encode text into strings. Use encodeUtf8
+-- FIXME   instead.
+-- FIXME * Split into request builder and request executer
 apiJ :: (MonadAPI m x s)
     => String
     -- ^ API method name
@@ -122,6 +122,25 @@ api m args = do
     Right a -> return a
     Left e -> terminate (JSONParseFailure' j e)
 
+-- | Invoke the request, in case of failure, escalate the probelm to the
+-- superwiser. The superwiser has a chance to change the arguments
+apiR :: (Aeson.FromJSON a, MonadAPI m x s)
+    => MethodName -- ^ API method name
+    -> MethodArgs -- ^ API method arguments
+    -> API m x a
+apiR m0 args0 = go (ReExec m0 args0) where
+  go action = do
+    j@JSON{..} <- do
+      case action of
+        ReExec m args -> do
+          apiJ m args
+        ReParse j -> do
+          pure j
+    case Aeson.parseEither Aeson.parseJSON js_aeson of
+      (Right a) -> return a
+      (Left e) -> do
+        recovery <- raise (CallFailure (m0, args0, j, e))
+        go recovery
 
 -- | Invoke the request, return answer as a Haskell datatype or @ErrorRecord@
 -- object

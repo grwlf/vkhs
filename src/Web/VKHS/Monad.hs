@@ -61,7 +61,7 @@ terminate r = do
   err r
   undefined
 
--- | Request to the Superviser to log certain @text@
+-- | Request the superviser to log @text@
 log_error :: MonadVK (t (R t a)) (Result t a) => Text -> t (R t a) ()
 log_error text = raise (LogError text)
 
