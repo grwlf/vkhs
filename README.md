@@ -92,7 +92,7 @@ VKQ may save the access tokein into state file:
 
     .. VKQ will ask for email/password and cache the access token
 
-    $ vkq call groups.search q=Beatles --pretty --access-token-file=.access-toke
+    $ vkq call groups.search q=Beatles --pretty --access-token-file=.access-token
 
 
 Performing custom API calls
