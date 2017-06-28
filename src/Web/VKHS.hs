@@ -150,7 +150,9 @@ defaultSuperviser = go where
                 alert $ "Too many requests per second, consider changing options"
                 go (k $ ReExec m args)
               ErrorCode ec -> do
-                alert $ "Unknown error code " <> tshow ec
+                alert $  "Unhandled error code " <> tshow ec <> "\n"
+                      <> "Consider improving the 'defaultSuperwiser' or using \n"
+                      <> "`apiH` / `apiHS` with custom error handlers"
                 lift $ throwError res_desc
 
       _ -> do
