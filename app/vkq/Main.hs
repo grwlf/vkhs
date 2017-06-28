@@ -4,31 +4,20 @@
 
 module Main where
 
-import Control.Exception (SomeException(..),catch,bracket)
-import Control.Monad
+import Prelude hiding(putStrLn)
 import Control.Monad.Except
-import Control.Monad.Trans
-import Control.Arrow ((***))
-import Data.Maybe
-import Data.List
-import Data.Char
-import Data.Text(Text(..),pack, unpack)
-import qualified Data.Text as Text
-import Data.Text.IO(putStrLn, hPutStrLn)
-import qualified Data.Text.IO as Text
-import Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as BS
-import Data.Monoid((<>))
-import Options.Applicative
-import qualified Sound.TagLib as TagLib
 import System.Environment
 import System.Exit
 import System.IO(stderr)
+import Options.Applicative
 import Text.RegexPR
-import Text.Printf
-import Text.Show.Pretty
-import Prelude hiding(putStrLn)
 
+import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
+import qualified Data.ByteString.Char8 as BS
+import qualified Sound.TagLib as TagLib
+
+import Web.VKHS.Imports
 import Web.VKHS
 import Web.VKHS.Types
 import Web.VKHS.Client as Client

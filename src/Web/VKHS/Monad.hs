@@ -1,4 +1,5 @@
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -30,6 +31,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 
+import Web.VKHS.Imports
 import Web.VKHS.Error
 import Web.VKHS.Types
 import Web.VKHS.Client hiding(Error)
@@ -89,5 +91,36 @@ debug str = do
 alert :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
 alert str = do
     liftIO $ Text.hPutStrLn stderr str
+
+getGenericOptions :: (MonadState s m, ToGenericOptions s) => m GenericOptions
+getGenericOptions = gets toGenericOptions
+
+-- | Read the access token according with respect to user-defined parameters
+--
+-- See also 'modifyAccessToken'
+readInitialAccessToken :: (MonadIO m, MonadState s m, ToGenericOptions s) => m (Maybe AccessToken)
+readInitialAccessToken =
+  let
+    str2at s = Just (AccessToken s "<unknown>" "<unknown>")
+
+    safeReadFile fn = do
+      liftIO $ Web.VKHS.Imports.catch (Just <$> readFile fn) (\(e :: SomeException) -> return Nothing)
+
+  in do
+  GenericOptions{..} <- getGenericOptions
+  case l_access_token of
+   [] -> do
+    case l_access_token_file of
+      [] -> return Nothing
+      fl -> do
+        safeReadFile l_access_token_file >>= \case
+          Just txt -> do
+            case readMaybe txt of
+              Just at -> return (Just at)
+              Nothing -> return (str2at txt)
+          Nothing -> do
+            return Nothing
+   _ -> do
+    return (str2at l_access_token)
 
 

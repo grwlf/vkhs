@@ -10,12 +10,7 @@
 
 module Web.VKHS.API.Base where
 
-import Data.List
-import Data.Maybe
 import Data.Time
-import Data.Either
-import Control.Arrow ((***),(&&&))
-import Control.Category ((>>>))
 import Control.Applicative
 import Control.Monad
 import Control.Monad.State
@@ -23,10 +18,7 @@ import Control.Monad.Writer
 import Control.Monad.Cont
 import Control.Exception (catch, SomeException)
 
-import Data.Text(Text)
 import qualified Data.Text as Text
-
-import Data.ByteString.Char8 (ByteString)
 import Data.ByteString.Lazy (fromStrict,toChunks)
 import qualified Data.ByteString.Char8 as BS
 
@@ -38,6 +30,7 @@ import qualified Data.Aeson.Encode.Pretty as Aeson
 import Text.Printf
 import Text.Read (readMaybe)
 
+import Web.VKHS.Imports
 import Web.VKHS.Types
 import Web.VKHS.Client hiding (Response(..))
 import Web.VKHS.Monad
@@ -58,38 +51,10 @@ class ToGenericOptions s => ToAPIState s where
   toAPIState :: s -> APIState
   modifyAPIState :: (APIState -> APIState) -> (s -> s)
 
-getGenericOptions :: (MonadState s m, ToGenericOptions s) => m GenericOptions
-getGenericOptions = gets toGenericOptions
-
--- | Read the access token according with respect to user-defined parameters
-readInitialAccessToken :: (MonadIO m, MonadState s m, ToAPIState s) => m (Maybe AccessToken)
-readInitialAccessToken =
-  let
-    str2at s = Just (AccessToken s "<unknown>" "<unknown>")
-
-    safeReadFile fn = do
-      liftIO $ Control.Exception.catch (Just <$> readFile fn) (\(e :: SomeException) -> return Nothing)
-
-  in do
-  GenericOptions{..} <- getGenericOptions
-  case l_access_token of
-   [] -> do
-    case l_access_token_file of
-      [] -> return Nothing
-      fl -> do
-        safeReadFile l_access_token_file >>= \case
-          Just txt -> do
-            case readMaybe txt of
-              Just at -> return (Just at)
-              Nothing -> return (str2at txt)
-          Nothing -> do
-            return Nothing
-   _ -> do
-    return (str2at l_access_token)
-
-
 -- | Modifies VK access token in the internal state as well as in the external
--- storage, if enabled
+-- storage, if enabled.
+--
+-- See also 'readInitialAccessToken'
 modifyAccessToken :: (MonadIO m, MonadState s m, ToAPIState s) => AccessToken -> m ()
 modifyAccessToken at@AccessToken{..} = do
   modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
@@ -108,7 +73,7 @@ type API m x a = m (R m x) a
 
 -- | Utility function to parse JSON object
 --
--- FIXME * Don't raise exception, simply return `Left err`
+-- * FIXME Don't raise exception, simply return `Left err`
 decodeJSON :: (MonadAPI m x s)
     => ByteString
     -> API m x JSON
@@ -123,9 +88,9 @@ decodeJSON bs = do
 -- <https://vk.com/dev/methods>
 -- <https://vk.com/dev/json_schema>
 --
--- FIXME * We currentyl use Text.unpack to encode text into strings. Use encodeUtf8
--- FIXME   instead.
--- FIXME * Split into request builder and request executer
+-- * FIXME We currentyl use Text.unpack to encode text into strings. Use encodeUtf8
+--   FIXME instead.
+-- * FIXME Split into request builder and request executer
 apiJ :: (MonadAPI m x s)
     => String
     -- ^ API method name

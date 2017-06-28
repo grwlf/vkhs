@@ -1,3 +1,7 @@
+-- | This module contains base VK API types
+--
+-- See [VK development docs](https://vk.com/dev) for the details
+--
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -7,33 +11,21 @@
 
 module Web.VKHS.API.Types where
 
-import Data.Typeable
-import Data.Data
 import Data.Time.Clock
 import Data.Time.Clock.POSIX
-import Data.Monoid ((<>), Monoid(..))
-import Control.Applicative ((<|>))
 
-import Data.Aeson ((.=), (.:), (.:?), (.!=), FromJSON(..))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
+import qualified Data.Vector as Vector (head, tail)
 
-import Data.Vector as Vector (head, tail)
-import Data.Text
-
-import Text.Printf
-
+import Web.VKHS.Imports
 import Web.VKHS.Error
 import Web.VKHS.Types
--- import Web.VKHS.API.Base
-
--- See http://vk.com/developers.php?oid=-1&p=Авторизация_клиентских_приложений
--- (in Russian) for more details
 
 data Response a = Response {
     resp_json :: JSON
   , resp_data :: a
-  } deriving (Show, Data, Typeable)
+  } deriving (Show, Functor, Data, Typeable)
 
 emptyResponse :: (Monoid a) => Response a
 emptyResponse = Response (JSON $ Aeson.object []) mempty

@@ -7,13 +7,15 @@ import Web.VKHS.Types
 import Web.VKHS.Client (Response, Request, URL)
 import qualified Web.VKHS.Client as Client
 import Data.ByteString.Char8 (ByteString, unpack)
-import Data.Text (Text)
-import Data.Monoid ((<>))
+
+import Web.VKHS.Imports
 
 data Error = ETimeout | EClient Client.Error
   deriving(Show, Eq)
 
--- | Message type used by the Superwiser to comminicatre with VK program
+-- | Message type used by the Superwiser to comminicatre with 'VK' coroutine.
+--
+-- See 'apiR' for usage example.
 data CallRecovery =
     ReExec MethodName MethodArgs
   -- ^ VK program is to re-execute the method with the given parameters
@@ -22,14 +24,15 @@ data CallRecovery =
   -- question
   deriving(Show)
 
--- | Alias for `Result`
+-- | Alias for 'Result'
 type R t a = Result t a
 
--- | Result with continuation. @t@ represents the continuation monad, which
--- needs to track two types: the 'early break' type and the 'current result'
--- type. In the end both types are the same.
+-- | Result of 'VK' monad execution. @t@ represents the continuation monad, which
+-- needs to track two types: the early break @t@ and the current result @a@.
+-- In order to be runnable (e.g. by 'runVK') both types are need to be the same.
 --
--- FIXME: re-implement the concept using `Monad.Free` library
+-- * FIXME re-implement the concept using `Monad.Free` library
+-- * FIMXE clean out of test/unused constructors
 data Result t a =
     Fine a
   -- ^ The normal exit of a computation
@@ -59,6 +62,8 @@ data ResultDescription a =
   | DescError String
   deriving(Show)
 
+-- | A partial @Show@ for 'Result' class. Continuation parameters prevent it from be
+-- instance of standard Show.
 describeResult :: (Show a) => Result t a -> Text
 describeResult (Fine a) = "Fine " <> tshow a
 describeResult (UnexpectedInt e k) = "UnexpectedInt " <> (tshow e)

@@ -22,12 +22,6 @@ import qualified Data.Aeson.Types as Aeson
 import qualified Network.Shpider.Forms as Shpider
 
 
-bunpack = ByteString.unpack
-tpack = Text.pack
-tunpack = Text.unpack
-tshow :: (Show a) => a -> Text
-tshow = tpack . show
-
 -- | AccessToken is a authentication data, required by all VK API
 -- functions. It is a tuple of access_token, user_id, expires_in fields,
 -- returned by login procedure.
@@ -35,7 +29,7 @@ tshow = tpack . show
 -- See http://vk.com/developers.php?oid=-1&p=Авторизация_клиентских_приложений
 -- (in Russian) for more details
 --
--- See also `modifyAccessToken` and `readInitialAccessToken`
+-- See also 'modifyAccessToken' and 'readInitialAccessToken'
 data AccessToken = AccessToken {
     at_access_token :: String
   , at_user_id :: String
@@ -132,7 +126,7 @@ data GenericOptions = GenericOptions {
   -- ^ VK user name, (typically, an email). Empty string means no value is given
   , l_password :: String
   -- ^ VK password. Empty string means no value is given
-  -- FIXME: Hide plain-text passwords
+  -- * FIXME Hide plain-text passwords
   , l_access_token :: String
   -- ^ Initial access token, empty means 'not set'. Has higher precedence than
   -- l_access_token_file

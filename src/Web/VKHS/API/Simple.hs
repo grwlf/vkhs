@@ -1,22 +1,47 @@
+-- | This module contains definitions of VK various API bindings. I tried to
+-- keep it as simple as possible. More, the user is expected to copy any
+-- function from this module into their 'runhaskell' script and customize
+-- as required.
+--
+-- Runhaskell script may look like the following:
+-- @
+--     #!/usr/bin/env runhaskell
+--     {-# LANGUAGE RecordWildCards #-}
+--     {-# LANGUAGE OverloadedStrings #-}
+
+--     import Prelude ()
+--     import Web.VKHS
+--     import Web.VKHS.Imports
+
+--     main :: IO ()
+--     main = runVK_ defaultOptions $ do
+--       Sized cnt gs <- groupSearch "Котики"
+--       forM_ gs $ \gr@GroupRecord{..} -> do
+--         liftIO $ putStrLn gr_name
+--         liftIO $ putStrLn "--------------"
+--         Sized wc ws <- getGroupWall gr
+--         forM_ ws $ \WallRecord{..} -> do
+--           liftIO $ putStrLn wr_text
+--           liftIO $ putStrLn "--------------"
+-- @
+--
+-- See more scripts under @./app/runhaskell@ folder
+--
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
 module Web.VKHS.API.Simple where
 
-import Control.Monad.Trans (liftIO)
-import Data.List
-import Data.Text (Text)
-import Data.Monoid((<>))
+import Prelude()
 import qualified Data.Text as Text
-import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
-import Data.Function
+
+import Web.VKHS.Imports
 import Web.VKHS.Types
 import Web.VKHS.Monad
 import Web.VKHS.Error
-import Web.VKHS.Types(tshow)
 import Web.VKHS.Client(requestUploadPhoto, requestExecute, responseBody, responseBodyS)
 import Web.VKHS.API.Base
 import Web.VKHS.API.Types
@@ -24,14 +49,13 @@ import Web.VKHS.API.Types
 max_count = 1000
 ver = "5.44"
 
-apiSimple def nm args = apiD def nm (("v",ver):args)
+apiSimple nm args = resp_data <$> apiR nm (("v",ver):args)
 apiVer nm args = api nm (("v",ver):args)
 
 groupSearch :: (MonadAPI m x s) => Text -> API m x (Sized [GroupRecord])
 groupSearch q =
-  fmap (sortBy (compare `on` gr_members_count)) <$>
-  resp_data <$> do
-  apiSimple emptyResponse "groups.search" $
+  fmap (sortBy (compare `on` gr_members_count)) <$> do
+  apiSimple "groups.search" $
     [("q",q),
      ("fields", "can_post,members_count"),
      ("count", tpack (show max_count))]
@@ -48,8 +72,7 @@ getCountries =
 
 getCities :: (MonadAPI m x s) => Country -> Maybe Text -> API m x (Sized [City])
 getCities Country{..} mq =
-  resp_data <$> do
-  apiSimple emptyResponse "database.getCities" $
+  apiSimple "database.getCities" $
     [("country_id", tpack (show co_int)),
      ("count", tpack (show max_count))
     ] ++
@@ -57,8 +80,7 @@ getCities Country{..} mq =
 
 getGroupWall :: (MonadAPI m x s) => GroupRecord -> API m x (Sized [WallRecord])
 getGroupWall GroupRecord{..} =
-  resp_data <$> do
-  apiSimple emptyResponse "wall.get" $
+  apiSimple "wall.get" $
     [("owner_id", "-" <> tshow gr_id),
      ("count", "100")
     ]
@@ -66,8 +88,7 @@ getGroupWall GroupRecord{..} =
 -- TODO: Take User as argument for more type-safety
 getAlbums :: (MonadAPI m x s) => Maybe Integer -> API m x (Sized [Album])
 getAlbums muid =
-  resp_data <$> do
-  apiSimple emptyResponse "photos.getAlbums" $
+  apiSimple "photos.getAlbums" $
     (case muid of
      Just uid -> [("owner_id", tshow uid)]
      Nothing -> [])
@@ -92,7 +113,8 @@ getCurrentUser = do
     True -> return (head users)
 
 
--- FIXME: move low-level upload code to API.Base
+-- * FIXME fix setUserPhoto, it is not actually working
+-- * FIXME move low-level upload code to API.Base
 setUserPhoto :: (MonadAPI m x s) => UserRecord -> FilePath -> API m x ()
 setUserPhoto UserRecord{..} photo_path =  do
   photo <- liftIO $ BS.readFile photo_path
@@ -102,7 +124,7 @@ setUserPhoto UserRecord{..} photo_path =  do
   req <- ensure $ requestUploadPhoto ous_upload_url photo
   (res, _) <- requestExecute req
   j@JSON{..} <- decodeJSON (responseBody res)
-  liftIO $ putStrLn $ (responseBodyS res)
+  liftIO $ BS.putStrLn $ (responseBody res)
   UploadRecord{..} <-
     case Aeson.parseEither Aeson.parseJSON js_aeson of
       Right a -> return a

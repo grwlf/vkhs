@@ -34,6 +34,7 @@ import Web.VKHS.Types
 import Web.VKHS.Client
 import Web.VKHS.Monad
 import Web.VKHS.Error
+import Web.VKHS.Imports
 
 import Debug.Trace
 import System.IO
