@@ -23,8 +23,8 @@ Features
 Installing
 ==========
 
-Installing from Cabal
----------------------
+Installing from Hackage
+-----------------------
 
 In order to install VKHS, one typically should do the following
 
@@ -86,7 +86,7 @@ we have to set it up
 
     $ export VKQ_ACCESS_TOKEN=d785932b871f096bd73aac6a35d7a7c469dd788d796463a871e5beb5c61bc6c96788ec2
 
-VKQ may save the access tokein into state file:
+VKQ may cache the access tokein into a state file:
 
     $ vkq login --access-token-file=.access-token
 
@@ -106,7 +106,7 @@ vkq allows user to call arbitrary API method. The format is as follows:
 
 For example, lets call ausio.search method to get some Beatles records:
 
-    $ vkq call audio.search q=Beatles --pretty
+    $ vkq call group.search q=Beatles --pretty
 
       { "response": [
         614751,
