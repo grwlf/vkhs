@@ -72,12 +72,12 @@ VKQ is a command line tool which demonstrates API usage. It can be used for
 logging in, downloading music and reading wall messages.
 
 
-Log in
-------
+Log in to VK
+------------
 
 Here is an example session: Login first
 
-    ]$ vkq login user@mail.org pass123
+    $ vkq login user@mail.org pass123
     d8a41221616ef5ba19537125dc0349bad9d529fa15314ad765911726fe98b15185ac41a7ca2c62f3bf4b9
 
 VKQ returns three values. First is a access token which is required to execute
@@ -86,8 +86,17 @@ we have to set it up
 
     $ export VKQ_ACCESS_TOKEN=d785932b871f096bd73aac6a35d7a7c469dd788d796463a871e5beb5c61bc6c96788ec2
 
-Custom API calls
-----------------
+VKQ may save the access tokein into state file:
+
+    $ vkq login --access-token-file=.access-token
+
+    .. VKQ will ask for email/password and cache the access token
+
+    $ vkq call groups.search q=Beatles --pretty --access-token-file=.access-toke
+
+
+Performing custom API calls
+---------------------------
 
 vkq allows user to call arbitrary API method. The format is as follows:
 
