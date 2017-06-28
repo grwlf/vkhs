@@ -153,6 +153,41 @@ apiR m0 args0 = go (ReExec m0 args0) where
         recovery <- raise (CallFailure (m0, args0, j, e))
         go recovery
 
+-- | Invoke the request, in case of failure, escalate the probelm to the
+-- superwiser. The superwiser has a chance to change the arguments
+apiHM :: forall m x a s . (Aeson.FromJSON a, MonadAPI m x s)
+    => MethodName -- ^ API method name
+    -> MethodArgs -- ^ API method arguments
+    -> (ErrorRecord -> API m x (Maybe a))
+    -> API m x a
+apiHM m0 args0 handler = go (ReExec m0 args0) where
+  go action = do
+    j <- do
+      case action of
+        ReExec m args -> do
+          apiJ m args
+        ReParse j -> do
+          pure j
+    case (parseJSON j, parseJSON j) of
+      (Right (Response _ a), _) -> return a
+      (Left e, Right (Response _ err)) -> do
+        ma <- (handler err)
+        case ma of
+          Just a -> return a
+          Nothing -> do
+            recovery <- raise (CallFailure (m0, args0, j, e))
+            go recovery
+      (Left e1, Left e2) -> do
+        recovery <- raise (CallFailure (m0, args0, j, e1 <> ";" <> e2))
+        go recovery
+
+apiH :: forall m x a s . (Aeson.FromJSON a, MonadAPI m x s)
+    => MethodName -- ^ API method name
+    -> MethodArgs -- ^ API method arguments
+    -> (ErrorRecord -> Maybe a)
+    -> API m x a
+apiH m args handler = apiHM m args (\e -> pure (handler e) :: API m x (Maybe a))
+
 -- | Invoke the request, return answer as a Haskell datatype or @ErrorRecord@
 -- object
 apiE :: (Aeson.FromJSON a, MonadAPI m x s)

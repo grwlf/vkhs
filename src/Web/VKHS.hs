@@ -12,9 +12,7 @@ module Web.VKHS (
   , module Web.VKHS.Error
   , module Web.VKHS.Monad
   , module Web.VKHS.Login
-  , module Web.VKHS.API.Base
-  , module Web.VKHS.API.Types
-  , module Web.VKHS.API.Simple
+  , module Web.VKHS.API
   ) where
 
 import Data.Time
@@ -33,16 +31,14 @@ import qualified Data.Text as Text
 import Web.VKHS.Imports
 import Web.VKHS.Error
 import Web.VKHS.Types
-import Web.VKHS.Client hiding (Error, Response)
+import Web.VKHS.Client hiding (Error, Response, defaultState)
 import qualified Web.VKHS.Client as Client
 import Web.VKHS.Monad hiding (catch)
 import qualified Web.VKHS.Monad as VKHS
 import Web.VKHS.Login (MonadLogin, LoginState(..), ToLoginState(..), printForm, login)
 import qualified Web.VKHS.Login as Login
-import Web.VKHS.API.Base (MonadAPI, APIState(..), ToAPIState(..), api, modifyAccessToken)
-import qualified Web.VKHS.API.Base as API
-import Web.VKHS.API.Types
-import Web.VKHS.API.Simple
+import Web.VKHS.API
+import qualified Web.VKHS.API as API
 
 -- | Main state of the VK monad stack. Consists of lesser states plus a copy of
 -- generic options provided by the caller.
@@ -145,12 +141,15 @@ defaultSuperviser = go where
 
           Right (Response _ ErrorRecord{..}) -> do
             case er_code of
-              5 -> do
+              NotLoggedIn -> do
                 alert $ "Attempting to re-login"
                 at <- defaultSuperviser (login >>= return . Fine)
                 modifyAccessToken at
                 go (k $ ReExec m args)
-              ec -> do
+              TooManyRequestsPerSec -> do
+                alert $ "Too many requests per second, consider changing options"
+                go (k $ ReExec m args)
+              ErrorCode ec -> do
                 alert $ "Unknown error code " <> tshow ec
                 lift $ throwError res_desc
 

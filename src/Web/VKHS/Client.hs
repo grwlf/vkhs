@@ -11,6 +11,7 @@ import Data.List
 import Data.Maybe
 import Data.Time
 import Data.Either
+import Data.Monoid((<>))
 import Control.Applicative
 import Control.Arrow ((&&&),(***))
 import Control.Monad
@@ -66,6 +67,7 @@ data ClientState = ClientState {
     cl_man :: Client.Manager
   , cl_last_execute :: TimeSpec
   , cl_minimum_interval_ns :: Integer
+  , cl_verbose :: Bool
   }
 
 defaultState :: GenericOptions -> IO ClientState
@@ -77,6 +79,7 @@ defaultState GenericOptions{..} = do
                   False -> Client.defaultManagerSettings))
   cl_last_execute <- pure (TimeSpec 0 0)
   cl_minimum_interval_ns <- pure (round (10^9  / o_max_request_rate_per_sec))
+  cl_verbose <- pure o_verbose
   return ClientState{..}
 
 class ToClientState s where
@@ -265,6 +268,8 @@ requestExecute Request{..} = do
     clk <- Clock.getTime Clock.Realtime
     let interval_ns = toNanoSecs (clk `diffTimeSpec` cl_last_execute)
     when (interval_ns < cl_minimum_interval_ns) $ do
+      when cl_verbose $ do
+        hPutStrLn stderr $ "Delaying execution to match the request threshold limit of " <> show cl_minimum_interval_ns <> " ns"
       threadDelay (fromInteger $ (cl_minimum_interval_ns - interval_ns) `div` 1000); -- convert ns to us
     return clk
 

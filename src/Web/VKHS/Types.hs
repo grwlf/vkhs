@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE RecordWildCards #-}
 module Web.VKHS.Types where
 
 import Data.List
@@ -10,6 +11,7 @@ import Data.Data
 import Data.Typeable
 
 import Data.Text(Text)
+import qualified Data.Text.IO as Text
 import qualified Data.Text as Text
 
 import Data.ByteString.Char8 (ByteString)
@@ -20,6 +22,10 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 
 import qualified Network.Shpider.Forms as Shpider
+
+import Control.Monad.State (MonadState(..), gets)
+import Web.VKHS.Imports
+import System.IO (stderr)
 
 
 -- | AccessToken is a authentication data, required by all VK API
@@ -141,14 +147,14 @@ defaultOptions = GenericOptions {
   , o_port = 443
   , o_verbose = False
   , o_use_https = True
-  , o_max_request_rate_per_sec = 3
+  , o_max_request_rate_per_sec = 2
   , o_allow_interactive = True
 
   , l_appid  = AppID "3128877"
   , l_username = ""
   , l_password = ""
   , l_access_token = ""
-  , l_access_token_file = ""
+  , l_access_token_file = ".vkhs-access-token"
   }
 
 class ToGenericOptions s where
@@ -156,6 +162,16 @@ class ToGenericOptions s where
 
 data Verbosity = Normal | Trace | Debug
   deriving(Enum,Eq,Ord,Show)
+
+debug :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
+debug str = do
+  GenericOptions{..} <- gets toGenericOptions
+  when o_verbose $ do
+    liftIO $ Text.hPutStrLn stderr str
+
+alert :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
+alert str = do
+    liftIO $ Text.hPutStrLn stderr str
 
 
 data MusicOptions = MusicOptions {

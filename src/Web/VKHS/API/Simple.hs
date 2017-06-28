@@ -30,6 +30,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Web.VKHS.API.Simple where
 
 import Prelude()
@@ -50,15 +51,23 @@ max_count = 1000
 ver = "5.44"
 
 apiSimple nm args = resp_data <$> apiR nm (("v",ver):args)
+apiSimpleH nm args handler = apiH nm (("v",ver):args) handler
+apiSimpleHM nm args handler = apiHM nm (("v",ver):args) handler
 apiVer nm args = api nm (("v",ver):args)
 
 groupSearch :: (MonadAPI m x s) => Text -> API m x (Sized [GroupRecord])
 groupSearch q =
   fmap (sortBy (compare `on` gr_members_count)) <$> do
-  apiSimple "groups.search" $
+  apiSimpleH "groups.search"
     [("q",q),
      ("fields", "can_post,members_count"),
      ("count", tpack (show max_count))]
+    (\ErrorRecord{..} ->
+      case er_code of
+        AccessDenied -> (Just $ Sized 0 [])
+        _ -> Nothing
+    )
+
 
 getCountries :: (MonadAPI m x s) => API m x (Sized [Country])
 getCountries =
@@ -78,12 +87,17 @@ getCities Country{..} mq =
     ] ++
     maybe [] (\q -> [("q",q)]) mq
 
-getGroupWall :: (MonadAPI m x s) => GroupRecord -> API m x (Sized [WallRecord])
+getGroupWall :: forall m x s . (MonadAPI m x s) => GroupRecord -> API m x (Sized [WallRecord])
 getGroupWall GroupRecord{..} =
-  apiSimple "wall.get" $
+  apiSimpleHM "wall.get"
     [("owner_id", "-" <> tshow gr_id),
      ("count", "100")
     ]
+    (\ErrorRecord{..} ->
+      case er_code of
+        AccessDenied -> return (Just $ Sized 0 [])
+        _ -> return Nothing
+        :: API m x (Maybe (Sized [WallRecord])))
 
 -- TODO: Take User as argument for more type-safety
 getAlbums :: (MonadAPI m x s) => Maybe Integer -> API m x (Sized [Album])

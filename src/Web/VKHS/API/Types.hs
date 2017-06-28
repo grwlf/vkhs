@@ -2,6 +2,7 @@
 --
 -- See [VK development docs](https://vk.com/dev) for the details
 --
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -97,9 +98,23 @@ instance FromJSON UserRecord where
       <*> (o .:? "deactivated")
       <*> (o .:? "hidden")
 
+data ErrorCode =
+    AccessDenied
+  | NotLoggedIn
+  | TooManyRequestsPerSec
+  | ErrorCode Scientific
+  deriving(Show,Read, Eq, Ord)
+
+instance FromJSON ErrorCode where
+  parseJSON = Aeson.withScientific "ErrorCode" $ \n ->
+    case n of
+      5 -> return NotLoggedIn
+      6 -> return TooManyRequestsPerSec
+      15 -> return AccessDenied
+      x -> return (ErrorCode x)
 
 data ErrorRecord = ErrorRecord
-  { er_code :: Int
+  { er_code :: ErrorCode
   , er_msg :: Text
   } deriving(Show)
 

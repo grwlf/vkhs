@@ -20,6 +20,7 @@ module Web.VKHS.Imports (
   , module Data.Maybe
   , module Data.Typeable
   , module Data.Data
+  , module Data.Scientific
   , module Text.Printf
   , module Prelude
   , module Text.Show.Pretty
@@ -38,6 +39,7 @@ import Data.Data
 import Data.Char
 import Data.ByteString.Char8 (ByteString)
 import Data.ByteString.Lazy (fromStrict,toChunks)
+import Data.Scientific (Scientific, FPFormat(..))
 import Data.Either
 import Data.Maybe
 import Data.Monoid((<>))

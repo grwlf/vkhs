@@ -15,7 +15,7 @@ let
       }:
       mkDerivation {
         pname = "VKHS";
-        version = "1.8.1";
+        version = "1.8.2";
         src = ./.;
         isLibrary = true;
         isExecutable = true;
@@ -25,7 +25,7 @@ let
           containers data-default-class directory filepath http-client
           http-client-tls http-types mtl network-uri optparse-applicative
           parsec pipes pipes-http pretty-show split taglib tagsoup time
-          utf8-string vector cabal-install zlib
+          utf8-string vector cabal-install zlib scientific
         ];
         executableHaskellDepends = [ regexpr text haskdogs ];
         executableToolDepends = [ haskdogs hasktags ];
