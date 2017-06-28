@@ -98,7 +98,7 @@ opts m =
         <*> switch (long "pretty" <> help "Pretty print resulting JSON")))
             ( progDesc "Call VK API method" ))
 
-  in subparser (
+  in hsubparser (
        command "login" (info (Login <$> genericOptions_login <*> (LoginOptions
       <$> flag False True (long "eval" <> help "Print in shell-friendly format")
       ))
