@@ -64,7 +64,6 @@ library
                      vector,
                      filepath,
                      directory,
-                     taglib,
                      pretty-show
 
 executable vkq

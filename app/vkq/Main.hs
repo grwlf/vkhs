@@ -15,7 +15,6 @@ import Text.RegexPR
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.ByteString.Char8 as BS
-import qualified Sound.TagLib as TagLib
 
 import Web.VKHS.Imports
 import Web.VKHS
@@ -208,78 +207,8 @@ cmd (API go APIOptions{..}) = do
         liftIO $ BS.putStrLn $ jsonEncode x
   return ()
 
-cmd (Music go@GenericOptions{..} mo@MusicOptions{..})
-
-  -- Query music files
-  |not (null m_search_string) = do
-    runAPI go $ do
-      API.Response _ (SizedList len ms) <- api_S "audio.search" [("q",m_search_string), ("count", "1000")]
-      forM_ ms $ \m -> do
-        io $ printf "%s\n" (mr_format m_output_format m)
-      io $ printf "total %d\n" len
-
-  -- List music files
-  |m_list_music = do
-    runAPI go $ do
-      (API.Response _ (ms :: [MusicRecord])) <- api_S "audio.get" [("q",m_search_string)]
-      forM_ ms $ \m -> do
-        io $ printf "%s\n" (mr_format m_name_format m)
-
-  -- Download music files
-  |not (null m_records_id) = do
-    let out_dir = fromMaybe "." m_out_dir
-    runAPI go $ do
-      forM_ m_records_id $ \ mrid -> do
-        (API.Response _ (ms :: [MusicRecord])) <- api_S "audio.getById" [("audios", mrid)]
-        forM_ ms $ \mr@MusicRecord{..} -> do
-          (f, mh) <- liftIO $ openFileMR mo mr
-          case mh of
-            Just h -> do
-              u <- ensure (pure $ Client.urlFromString mr_url_str)
-              Client.downloadFileWith u (BS.hPut h)
-              io $ printf "%d_%d\n" mr_owner_id mr_id
-              io $ printf "%s\n" mr_title
-              io $ printf "%s\n" f
-              liftIO $ do
-                tagfile <- TagLib.open f
-                case tagfile of
-                  Just tagfile -> do
-                    tag <- TagLib.tag tagfile
-                    case tag of
-                      Just it -> do
-                        it `TagLib.setArtist` ensureUnicode mr_artist
-                        it `TagLib.setTitle`  ensureUnicode mr_title
-                        it `TagLib.setComment` ""
-                        it `TagLib.setAlbum`   ""
-                        it `TagLib.setGenre`   ""
-                        it `TagLib.setTrack`   0
-                        it `TagLib.setYear`    0
-                        TagLib.save tagfile
-                        return ()
-                      where
-                        ensureUnicode = unpack . pack
-
-            Nothing -> do
-              io $ hPutStrLn stderr ("File " <> Text.pack f <> " already exist, skipping")
-          return ()
-
--- Download audio files
--- cmd (Options v (Music (MO act False [] _ ofmt odir rid sk))) = do
---   let e = (envcall act) { verbose = v }
---   Response (ms :: [MusicRecord]) <- api_ e "audio.getById" [("audios", concat $ intersperse "," rid)]
---   forM_ ms $ \m -> do
---     (fp, mh) <- openFileMR odir sk ofmt m
---     case mh of
---       Just h -> do
---         r <- vk_curl_file e (url m) $ \ bs -> do
---           BS.hPut h bs
---         checkRight r
---         printf "%d_%d\n" (owner_id m) (aid m)
---         printf "%s\n" (title m)
---         printf "%s\n" fp
---       Nothing -> do
---         hPutStrLn stderr (printf "File %s already exist, skipping" fp)
---     return ()
+cmd (Music go@GenericOptions{..} mo@MusicOptions{..}) = do
+  error "VK disabled audio API since 2016/11."
 
 -- Query groups files
 cmd (GroupQ go (GroupOptions{..}))
