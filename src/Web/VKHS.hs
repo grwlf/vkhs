@@ -74,7 +74,7 @@ type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
 -- early exit by the means of continuation monad. VK encodes a coroutine which
 -- has entry points defined by 'Result' datatype.
 --
--- See also 'runVK' and 'defaultSuperwiser`.
+-- See also 'runVK' and 'defaultSupervisor`.
 --
 -- * FIXME Re-write using modern 'Monad.Free'
 newtype VK r a = VK { unVK :: Guts VK (StateT State (ExceptT Text IO)) r a }
@@ -91,7 +91,7 @@ stepVK :: VK r r -> StateT State (ExceptT Text IO) r
 stepVK m = runContT (runReaderT (unVK (VKHS.catch m)) undefined) return
 
 -- | Run VK monad @m@ and handle continuation requests using default
--- algorithm. @defaultSuperwiser@ would relogin on invalid access token
+-- algorithm. @defaultSupervisor@ would relogin on invalid access token
 -- condition, ask for missing form fields (typically - an email/password)
 --
 -- See also 'runVK'
@@ -99,8 +99,8 @@ stepVK m = runContT (runReaderT (unVK (VKHS.catch m)) undefined) return
 -- * FIXME Store known answers in external DB (in file?) instead of LoginState
 --   FIXME dictionary
 -- * FIXME Handle capthas (offer running standalone apps)
-defaultSuperviser :: (Show a) => VK (R VK a) (R VK a) -> StateT State (ExceptT Text IO) a
-defaultSuperviser = go where
+defaultSupervisor :: (Show a) => VK (R VK a) (R VK a) -> StateT State (ExceptT Text IO) a
+defaultSupervisor = go where
   go m = do
     GenericOptions{..} <- toGenericOptions <$> get
     res <- stepVK m
@@ -143,7 +143,7 @@ defaultSuperviser = go where
             case er_code of
               NotLoggedIn -> do
                 alert $ "Attempting to re-login"
-                at <- defaultSuperviser (login >>= return . Fine)
+                at <- defaultSupervisor (login >>= return . Fine)
                 modifyAccessToken at
                 go (k $ ReExec m args)
               TooManyRequestsPerSec -> do
@@ -151,7 +151,7 @@ defaultSuperviser = go where
                 go (k $ ReExec m args)
               ErrorCode ec -> do
                 alert $  "Unhandled error code " <> tshow ec <> "\n"
-                      <> "Consider improving 'defaultSuperwiser' or applying \n"
+                      <> "Consider improving 'defaultSupervisor' or applying \n"
                       <> "custom error filters using `apiH` ,`apiHS` or their \n"
                       <> "high-level wrappers `apiSimpleH` / `apiSimpleHM`"
                 lift $ throwError res_desc
@@ -160,14 +160,14 @@ defaultSuperviser = go where
         alert $ "Unsupervised error: " <> res_desc
         lift $ throwError res_desc
 
--- | Run login procedure using 'defaultSuperwiser'. Return 'AccessToken' on
+-- | Run login procedure using 'defaultSupervisor'. Return 'AccessToken' on
 -- success
 runLogin :: GenericOptions -> ExceptT Text IO AccessToken
 runLogin go = do
   s <- initialState go
-  evalStateT (defaultSuperviser (login >>= return . Fine)) s
+  evalStateT (defaultSupervisor (login >>= return . Fine)) s
 
--- | Run the VK monad @m@ using generic options @go@ and 'defaultSuperwiser'.
+-- | Run the VK monad @m@ using generic options @go@ and 'defaultSupervisor'.
 -- Perform login procedure if needed. This is an mid-layer runner, consider
 -- using 'runVK' instead.
 runAPI :: Show b => GenericOptions -> VK (R VK b) b -> ExceptT Text IO b
@@ -177,14 +177,14 @@ runAPI go@GenericOptions{..} m = do
 
     at <- readInitialAccessToken >>= \case
       Nothing ->
-        defaultSuperviser (login >>= return . Fine)
+        defaultSupervisor (login >>= return . Fine)
       Just at ->
         pure at
 
     modifyAccessToken at
-    defaultSuperviser (m >>= return . Fine)
+    defaultSupervisor (m >>= return . Fine)
 
--- | Run the VK monad @m@ using generic options @go@ and 'defaultSuperwiser'
+-- | Run the VK monad @m@ using generic options @go@ and 'defaultSupervisor'
 runVK :: Show a => GenericOptions -> VK (R VK a) a -> IO (Either Text a)
 runVK go = runExceptT . runAPI go
 

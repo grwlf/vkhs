@@ -135,7 +135,7 @@ api m args = do
     Left e -> terminate (JSONParseFailure' j e)
 
 -- | Invoke the request, in case of failure, escalate the probelm to the
--- superwiser. The superwiser has a chance to change the arguments
+-- supervisor. The superwiser has a chance to change the arguments
 apiR :: (Aeson.FromJSON a, MonadAPI m x s)
     => MethodName -- ^ API method name
     -> MethodArgs -- ^ API method arguments
@@ -155,7 +155,7 @@ apiR m0 args0 = go (ReExec m0 args0) where
         go recovery
 
 -- | Invoke the request, in case of failure, escalate the probelm to the
--- superwiser. The superwiser has a chance to change the arguments
+-- supervisor. The superwiser has a chance to change the arguments
 apiHM :: forall m x a s . (Aeson.FromJSON a, MonadAPI m x s)
     => MethodName -- ^ API method name
     -> MethodArgs -- ^ API method arguments

@@ -2,31 +2,33 @@ VKHS
 ====
 
 VKHS provides access to [Vkontakte](http://vk.com) social network, popular
-mainly in Russia.  Library can be used to login into the network as a standalone
-application (OAuth implicit flow as they call it). Having the access token, it
-is possible to call various API methods to query audio files or retrieve wall
-messages. For now, vkhs offers limited error detection and no captcha support.
+mainly in Russia.  Library can be used to login into the network as a
+standalone application (OAuth implicit flow as they call it). Having the access
+token, it is possible to call various API methods to -query audio files-
+(disabled by VK) or retrieve wall messages.
 
 Features
 ========
 
-* Provide access to VK API. Interface options include: VK monad and `vkq` command
+* Provides access to VK API. Interface options include: VK monad and `vkq` command
   line tool.
-* Use HTTPS protocol.
-* Solve login form interaction, may be used to operate new/disposable VK accounts.
-* VK monad is an interruptable coroutine. The superwiser supports ondemand
-  re-login, and may be used for long-running tasks.
+* Uses HTTPS protocol.
+* Solves login form interaction, may be used to operate new/disposable VK accounts.
+* VK monad is designed as an interruptable coroutine. The supervisor supports
+  ondemand re-login, and may be used for long-running tasks.
 * Project includes a set of `Web.VKHS.API.Simple` wrappers designed to be
   copied into `runhaskell` scripts and tweaked according to ones need.
+* No more dependencies on curlhs/taglib.
 
 Issues
 ======
 
-* Still no support for captchas, one probably should hack `defaultSuperwiser`
-  and add them
-* Network connection timeout is not handled by superwiser
+* Still no support for captchas, one probably should hack `defaultSupervisor`
+  and add them.
+* Network connection timeout is not handled by the coroutine supervisor.
 * Minor issues here and there. Use `git grep FIXME` to find them
-* File uploading still not functioning
+* File uploading still not functioning.
+* Lots grammatical mistakes. Any corrections will be kindly accepted.
 
 Installing
 ==========
@@ -38,9 +40,6 @@ In order to install VKHS, one typically should do the following
 
     $ cabal update
     $ cabal install VKHS
-
-Note, that VKHS uses curlhs and should be linked with libcurl.so. Normally,
-cabal handles it without problems.
 
 
 Installing from source
@@ -54,29 +53,33 @@ Developing using Nix
 --------------------
 
 The author of this project uses [Nix](http://nixos.org) as a main development
-platform. Typical development procedure includes the following steps:
+platform. The `default.nix` file contain Nix expression describing the environment
+
+#### Entering Nix shell environment
 
     $ git clone https://github.com/grwlf/vkhs
     $ cd vkhs
-    $
     $ nix-shell
 
-      .. Entering Nix shell environment
+#### Usual development
 
     $ ghci -isrc:app/vkq:app/common
-    $ exit
+    $ cabal install
+    $ ^D
 
-      ..  Now exiting from the Nix shell
+#### Returning to the system shell
 
+    $ ^D
     $ nix-build
+    $ ls ./result
 
-The `default.nix` file contain Nix expression describing the environment
 
 Building ctags file
 -------------------
 
-`./mktags.sh` script may be used to build ctags file. It used `haskdogs` tool,
-which should be installed from Hackage.
+`./mktags.sh` script may be used to build ctags `tags` file supported by many
+text editors. The script uses `hasktags` via `haskdogs` tools, available on
+Hackage.
 
     $ haskdogs
 
@@ -86,34 +89,35 @@ VKQ command line application
 ============================
 
 `vkq` is a command line tool which demonstrates API usage. It can be used for
-logging in, downloading music and reading wall messages. Call `vkq --help` or
+logging in, -downloading music- and reading wall messages. Call `vkq --help` or
 `vkq --help [command]` to read online help.
 
 
-Log in to VK
-------------
+Logging in to VK
+----------------
 
-Here is an example session: Login first
+In order to send API requests, the VK client typically needs an access token.
+`vkq` receives it as a result of signing in.  Once received, the token may be
+saved to `VKQ_ACCESS_TOKEN` environment variable, into `.vkhs-access-token`
+file or passed to future instances directly using `-a` argument.
+
+#### Saving access token in the environment variable
 
     $ vkq login user@mail.org pass123
     d8a41221616ef5ba19537125dc0349bad9d529fa15314ad765911726fe98b15185ac41a7ca2c62f3bf4b9
-
-VKQ returns three values. First one is an access token required to execute all
-API requests. `vkq` tries to reads it from `VKQ_ACCESS_TOKEN` environment variable or
-from `.vkhs-access-token` file (may be changed using options).
-
     $ export VKQ_ACCESS_TOKEN=d785932b871f096bd73aac6a35d7a7c469dd788d796463a871e5beb5c61bc6c96788ec2
 
-VKQ may cache the access tokein into a state file:
+Alternatively, using `--eval` option
+
+    $ eval `vkq login user@mail.org pass123 --eval`
+
+#### Saving access token to file
 
     $ vkq login --access-token-file=.access-token
 
-    .. VKQ will ask for email/password and cache the access token
-
-    $ vkq call groups.search q=Beatles --pretty --access-token-file=.access-token
-
-Latest versions of the library have `--access-token-flag` option enabled by
-default. Set it to empty value to disable the caching feature.
+VKQ will ask for email/password and cache the access token into a file.  Newer
+versions of VKHS have `--access-token-flag` option enabled by default. Set it
+to empty value to disable the caching feature.
 
 
 Performing custom API calls
