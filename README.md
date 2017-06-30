@@ -32,6 +32,7 @@ ToDo
 * Minor issues here and there. Use `git grep FIXME` to find them
 * File uploading still not functioning.
 * Network connection timeout is not handled by the coroutine supervisor.
+* Enhance the way `vkq` accepts arguments, support multy-line messages.
 * Grammatical mistakes. Any corrections will be kindly accepted.
 
 Installing
@@ -149,7 +150,7 @@ Performing API calls
       -h,--help                Show this help text
 
 
-For example, example session may look like following:
+The session may look like the following:
 
     $ vkq api "messages.send" "user_id=111111,message=\"test\""  --pretty
     bd7da7e9cfb4cc12c0a49093173ca8785c7d6c918f00edb7315bb8526f5f372f1174b643e50e1a47d35da
