@@ -162,7 +162,6 @@ The session may look like the following:
     {"response":57505}
 
     $ vkq api "groups.search" "q=Haskell"
-		$ vkq api "groups.search" "q=Haskell" --pretty
     {
         "response": [
             30,
