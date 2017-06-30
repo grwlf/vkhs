@@ -94,8 +94,7 @@ VKQ command line application
 
 `vkq` is a command line tool which demonstrates API usage. It can be used for
 logging in, -downloading music- and reading wall messages. Call `vkq --help` or
-`vkq --help [command]` to read online help.
-
+`vkq command --help` to read online help.
 
 Logging in to VK
 ----------------
@@ -111,58 +110,85 @@ file or passed to future instances directly using `-a` argument.
     d8a41221616ef5ba19537125dc0349bad9d529fa15314ad765911726fe98b15185ac41a7ca2c62f3bf4b9
     $ export VKQ_ACCESS_TOKEN=d785932b871f096bd73aac6a35d7a7c469dd788d796463a871e5beb5c61bc6c96788ec2
 
-Alternatively, using `--eval` option
+Alternatively, result may be achieved using `--eval` option
 
     $ eval `vkq login user@mail.org pass123 --eval`
 
 #### Saving access token to file
 
-    $ vkq login --access-token-file=.access-token
-
-VKQ will ask for email/password and cache the access token into a file.  Newer
-versions of VKHS have `--access-token-flag` option enabled by default. Set it
-to empty value to disable the caching feature.
+VKQ will cache the access token into a file. Newer versions of VKHS have
+`--access-token-flag` option enabled by default. Set it to empty value to
+disable the caching.
 
 
-Performing custom API calls
----------------------------
+Performing API calls
+--------------------
 
-vkq allows user to call arbitrary API method. The format is as follows:
+`vkq` allows user to call arbitrary API method. The generic interface is as follows:
 
-    Usage: vkq call [--verbose] [--req-per-sec N] [--interactive] [--appid APPID]
-                    [--user USER] [--pass PASS] [-a ACCESS_TOKEN] METHOD PARAMS
+    $ vkq api --help
+    Usage: vkq api [--verbose] [--req-per-sec N] [--interactive] [--appid APPID]
+                   [--user USER] [--pass PASS] [-a ACCESS_TOKEN]
+                   [--access-token-file FILE] METHOD PARAMS [--pretty]
+      Call VK API method
+
+    Available options:
+      --verbose                Be verbose
+      --req-per-sec N          Max number of requests per second
+      --interactive            Allow interactive queries
+      --appid APPID            Application ID, defaults to VKHS
+      --user USER              User name or email
+      --pass PASS              User password
+      -a ACCESS_TOKEN          Access token. Honores VKQ_ACCESS_TOKEN environment
+                               variable
+      --access-token-file FILE Filename to store actual access token, should be used
+                               to pass its value between sessions
+      METHOD                   Method name
+      PARAMS                   Method arguments, KEY=VALUE[,KEY2=VALUE2[,,,]]
+      --pretty                 Pretty print resulting JSON
+      -h,--help                Show this help text
 
 
-For example, lets call ausio.search method to get some Beatles records:
+For example, example session may look like following:
 
-    $ vkq call group.search q=Beatles --pretty
+    $ vkq api "messages.send" "user_id=111111,message=\"test\""  --pretty
+    bd7da7e9cfb4cc12c0a49093173ca8785c7d6c918f00edb7315bb8526f5f372f1174b643e50e1a47d35da
 
-      { "response": [
-        614751,
-        {
-            "lyrics_id": "6604412",
-            "url": "http://cs1-36v4.vk-cdn.net/p16/59674dd8717db2.mp3?extra=k0s2ja3l6pq6aIDOEW5y5XUCs2--JLX9wZpzOT3iuSnZPR-DNhJSF075NUhICB_szMOKKlVJFFlqLlg691q6cKhwiGZgTRU1oAimXzXY396cfNAHnotc8--7w-0xnvoPK6qVoI8",
-            "aid": 85031440,
-            "title": "Twist and Shout  ",
-            "genre": 1,
-            "owner_id": 9559206,
-            "duration": 156,
-            "artist": "The Beatles"
-        },
-    ...
+    $ vkq api "users.get" ""
+    {"response":[{"first_name":"Сергей","uid":222222,"last_name":"Миронов"}]}
 
+    $ vkq api "messages.send" "user_id=333333,message=Hi theree!"
+    {"response":57505}
+
+    $ vkq api "groups.search" "q=Haskell"
+		$ vkq api "groups.search" "q=Haskell" --pretty
+    {
+        "response": [
+            30,
+            {
+                "screen_name": "ml_mat_asm",
+                "photo": "https://pp.userapi.com/c638217/v638217626/54113/v5Ib71-dDzo.jpg",
+                "is_closed": 0,
+                "photo_medium": "https://pp.userapi.com/c638217/v638217626/54112/Nu_si987vOc.jpg",
+                "name": "Matlab | Assembler | MathCAD | Haskell | Prolog",
+                "photo_big": "https://pp.userapi.com/c638217/v638217626/54111/HGnUbgUorVU.jpg",
+                "gid": 78651325,
+                "is_admin": 0,
+                "is_member": 0,
+                "type": "page"
+            },
+            ...
+    }
 
 VKHS library/runhaskell mode
 ============================
 
-Starting from 1.7.2 the library supports RunHaskell-mode. Consider the
-following example:
+Starting from 1.7.2 the library supports runhaskell-mode.
 
 
     #!/usr/bin/env runhaskell
     {-# LANGUAGE RecordWildCards #-}
 
-    import Prelude ()
     import Web.VKHS
     import Web.VKHS.Imports
 
@@ -170,12 +196,13 @@ following example:
     main = runVK_ defaultOptions $ do
       Sized cnt cs <- getCountries
       forM_ cs $ \Country{..} -> do
-        liftIO $ putStrLn co_title
+        liftIO $ tputStrLn co_title
 
 When executed, the program asks for login/password and outputs list of countries
 known to VK.  `getCountries` and several other methods are defined in
-`Web.VKHS.API.Simple`. `vkq` application may be used as a more elaborated
-example.
+`Web.VKHS.API.Simple`.
+
+The distribuption contains `./app/runhaskell` folder with a couple of examples.
 
 Debugging
 =========
