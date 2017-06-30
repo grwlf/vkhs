@@ -212,41 +212,6 @@ apiH :: forall m x a s . (Aeson.FromJSON a, MonadAPI m x s)
     -> API m x a
 apiH m args handler = apiHM m args (\e -> pure (handler e) :: API m x (Maybe a))
 
--- | Invoke the request, return answer as a Haskell datatype or @ErrorRecord@
--- object
-apiE :: (Aeson.FromJSON a, MonadAPI m x s)
-    => String           -- ^ API method name
-    -> [(String, Text)] -- ^ API method arguments
-    -> API m x (Either (Response ErrorRecord) a)
-apiE m args = apiJ m args >>= convert where
-  convert j = do
-    err <- pure $ parseJSON j
-    ans <- pure $ parseJSON j
-    case  (ans, err) of
-      (Right a, _) -> return (Right a)
-      (Left a, Right e) -> return (Left e)
-      (Left a, Left e) -> do
-        j' <- raise (JSONCovertionFailure
-                     (j, "apiE: " <> Text.pack m <> ": expecting either known response or error"))
-        convert j'
-
--- | Invoke the request, returns answer or the default value in case of error
-apiD :: (Aeson.FromJSON a, MonadAPI m x s)
-    => a
-    -> String           -- ^ API method name
-    -> [(String, Text)] -- ^ API method arguments
-    -> API m x a
-apiD def m args =
-  apiE m args >>= \case
-    Left err -> return def
-    Right x -> return x
-
--- | String version of @api@
--- Deprecated
-api_S :: (Aeson.FromJSON a, MonadAPI m x s)
-    => String -> [(String, String)] -> API m x a
-api_S m args = api m (map (id *** tpack) args)
-
 -- Encode JSON back to string
 jsonEncodeBS :: JSON -> ByteString
 jsonEncodeBS JSON{..} = BS.concat $ toChunks $ Aeson.encode js_aeson
