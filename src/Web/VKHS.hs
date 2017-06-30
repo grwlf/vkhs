@@ -156,6 +156,14 @@ defaultSupervisor = go where
                       <> "high-level wrappers `apiSimpleH` / `apiSimpleHM`"
                 lift $ throwError res_desc
 
+      RepeatedForm Form{..} k -> do
+        alert  $ "Failed to complete login procedure. Last seen form is\n"
+              <> "\n"
+              <> printForm "\t" form
+              <> "\n"
+              <> "You may try to obtain more details by setting --verbose flag and/or checking the 'latest.html' file"
+        lift $ throwError res_desc
+
       _ -> do
         alert $ "Unsupervised error: " <> res_desc
         lift $ throwError res_desc
@@ -175,13 +183,12 @@ runAPI go@GenericOptions{..} m = do
   s <- initialState go
   flip evalStateT s $ do
 
-    at <- readInitialAccessToken >>= \case
+    readInitialAccessToken >>= \case
       Nothing ->
-        defaultSupervisor (login >>= return . Fine)
-      Just at ->
-        pure at
+        return ()
+      Just at -> do
+        modifyAccessToken at
 
-    modifyAccessToken at
     defaultSupervisor (m >>= return . Fine)
 
 -- | Run the VK monad @m@ using generic options @go@ and 'defaultSupervisor'

@@ -8,21 +8,20 @@
 --     #!/usr/bin/env runhaskell
 --     {-# LANGUAGE RecordWildCards #-}
 --     {-# LANGUAGE OverloadedStrings #-}
-
---     import Prelude ()
+--
 --     import Web.VKHS
 --     import Web.VKHS.Imports
-
+--
 --     main :: IO ()
 --     main = runVK_ defaultOptions $ do
 --       Sized cnt gs <- groupSearch "Котики"
 --       forM_ gs $ \gr@GroupRecord{..} -> do
---         liftIO $ putStrLn gr_name
---         liftIO $ putStrLn "--------------"
+--         liftIO $ tputStrLn gr_name
+--         liftIO $ tputStrLn "--------------"
 --         Sized wc ws <- getGroupWall gr
 --         forM_ ws $ \WallRecord{..} -> do
---           liftIO $ putStrLn wr_text
---           liftIO $ putStrLn "--------------"
+--           liftIO $ tputStrLn wr_text
+--           liftIO $ tputStrLn "--------------"
 -- @
 --
 -- See more scripts under @./app/runhaskell@ folder
@@ -33,7 +32,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Web.VKHS.API.Simple where
 
-import Prelude()
 import qualified Data.Text as Text
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Aeson as Aeson
@@ -48,13 +46,17 @@ import Web.VKHS.API.Base
 import Web.VKHS.API.Types
 
 max_count = 1000
+
+-- | We are using API v5.44 by default
 ver = "5.44"
 
+apiSimpleF nm args f = apiRf nm (("v",ver):args) f
 apiSimple nm args = apiR nm (("v",ver):args)
 apiSimpleH nm args handler = apiH nm (("v",ver):args) handler
 apiSimpleHM nm args handler = apiHM nm (("v",ver):args) handler
 apiVer nm args = api nm (("v",ver):args)
 
+-- | This function demonstrates pure-functional error handling
 groupSearch :: (MonadAPI m x s) => Text -> API m x (Sized [GroupRecord])
 groupSearch q =
   fmap (sortBy (compare `on` gr_members_count)) <$> do
@@ -68,12 +70,10 @@ groupSearch q =
         _ -> Nothing
     )
 
-
 getCountries :: (MonadAPI m x s) => API m x (Sized [Country])
 getCountries =
   fmap (sortBy (compare `on` co_title)) <$> do
-  resp_data <$> do
-  apiR "database.getCountries" $
+  apiSimple "database.getCountries"
     [("v",ver),
      ("need_all", "1"),
      ("count", tpack (show max_count))
@@ -88,6 +88,8 @@ getCities Country{..} mq =
     maybe [] (\q -> [("q",q)]) mq
 
 -- | See [https://vk.com/dev/wall.get]
+--
+-- This function demonstrates monadic error handling
 getGroupWall :: forall m x s . (MonadAPI m x s) => GroupRecord -> API m x (Sized [WallRecord])
 getGroupWall GroupRecord{..} =
   apiSimpleHM "wall.get"
@@ -96,8 +98,10 @@ getGroupWall GroupRecord{..} =
     ]
     (\ErrorRecord{..} ->
       case er_code of
-        AccessDenied -> return (Just $ Sized 0 [])
-        _ -> return Nothing
+        AccessDenied -> do
+          return (Just $ Sized 0 [])
+        _ -> do
+          return Nothing
         :: API m x (Maybe (Sized [WallRecord])))
 
 -- TODO: Take User as argument for more type-safety
@@ -113,19 +117,15 @@ getAlbums muid =
 
 getPhotoUploadServer :: (MonadAPI m x s) => Album -> API m x PhotoUploadServer
 getPhotoUploadServer Album{..} =
-  resp_data <$> do
-  api "photos.getUploadServer" $
-    [("album_id", tshow al_id)
-    ]
+  apiSimple "photos.getUploadServer" [("album_id", tshow al_id)]
 
 
 getCurrentUser :: (MonadAPI m x s) => API m x UserRecord
 getCurrentUser = do
-  Response{..} <- apiVer "users.get" []
-  users <- pure resp_data
-  case (length users == 1) of
-    False -> terminate (JSONParseFailure' resp_json "getCurrentUser: expecting single UserRecord")
-    True -> return (head users)
+  apiSimpleF "users.get" [] $ \users ->
+    case (length users == 1) of
+      False -> Left "getCurrentUser: array with one user record"
+      True -> Right (head users)
 
 
 -- * FIXME fix setUserPhoto, it is not actually working

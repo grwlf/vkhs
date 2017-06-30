@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -49,21 +50,21 @@ data PhotoOptions = PhotoOptions {
   } deriving(Show)
 
 data Options
-  = Login GenericOptions LoginOptions
-  | API GenericOptions APIOptions
-  | Music GenericOptions MusicOptions
-  | UserQ GenericOptions UserOptions
-  | WallQ GenericOptions WallOptions
-  | GroupQ GenericOptions GroupOptions
-  | DBQ GenericOptions DBOptions
-  | Photo GenericOptions PhotoOptions
+  = Login { genOpts :: GenericOptions, loginOpts :: LoginOptions }
+  | API { genOpts :: GenericOptions, apiOpts :: APIOptions }
+  | Music { genOpts :: GenericOptions, musicOpts :: MusicOptions }
+  | UserQ { genOpts :: GenericOptions, userOpts :: UserOptions }
+  | WallQ { genOpts :: GenericOptions, wallOpts :: WallOptions }
+  | GroupQ { genOpts :: GenericOptions, groupOpts :: GroupOptions }
+  | DBQ { genOpts :: GenericOptions, dbOpts :: DBOptions }
+  | Photo { genOpts :: GenericOptions, photoOpts :: PhotoOptions }
   deriving(Show)
 
 toMaybe :: (Functor f) => f String -> f (Maybe String)
 toMaybe = fmap (\s -> if s == "" then Nothing else Just s)
 
 -- FIXME support --version flag
-opts m =
+optdesc m =
   let
 
       -- genericOptions_ :: Parser GenericOptions
@@ -81,7 +82,7 @@ opts m =
         <*> ppass
         <*> strOption (short 'a' <> m <> metavar "ACCESS_TOKEN" <>
               help ("Access token. Honores " ++ env_access_token ++ " environment variable"))
-        <*> strOption (long "access-token-file" <> value "" <> metavar "FILE" <>
+        <*> strOption (long "access-token-file" <> value (l_access_token_file defaultOptions) <> metavar "FILE" <>
               help ("Filename to store actual access token, should be used to pass its value between sessions"))
 
       genericOptions = genericOptions_
@@ -166,8 +167,8 @@ opts m =
 main :: IO ()
 main = ( do
   m <- maybe (value "") (value) <$> lookupEnv env_access_token
-  o <- execParser (info (helper <*> opts m) (fullDesc <> header "VKontakte social network tool"))
-  r <- runExceptT (cmd o)
+  o <- execParser (info (helper <*> optdesc m) (fullDesc <> header "VKontakte social network tool"))
+  r <- runVK (genOpts o) (cmd o)
   case r of
     Left err -> do
       hPutStrLn stderr err
@@ -188,25 +189,25 @@ main = ( do
 
  -}
 
-cmd :: Options -> ExceptT Text IO ()
+cmd :: (MonadLogin (m (R m x)) (R m x) s, MonadAPI m x s) => Options -> m (R m x) ()
 
 -- Login
 cmd (Login go LoginOptions{..}) = do
-  AccessToken{..} <- runLogin go
+  at@AccessToken{..} <- login
   case l_eval of
     True -> liftIO $ putStrLn $ Text.pack $ printf "export %s=%s\n" env_access_token at_access_token
-    False -> liftIO $ putStrLn $ Text.pack at_access_token
+    False -> do
+      modifyAccessToken at
+      liftIO $ putStrLn $ Text.pack at_access_token
 
 -- API / CALL
 cmd (API go APIOptions{..}) = do
-  runAPI go $ do
-    x <- apiJ a_method (map (id *** tpack) $ splitFragments "," "=" a_args)
-    if a_pretty
-      then do
-        liftIO $ putStrLn $ jsonEncodePretty x
-      else
-        liftIO $ putStrLn $ jsonEncode x
-  return ()
+  x <- apiJ a_method (map (id *** tpack) $ splitFragments "," "=" a_args)
+  if a_pretty
+    then do
+      liftIO $ putStrLn $ jsonEncodePretty x
+    else
+      liftIO $ putStrLn $ jsonEncode x
 
 cmd (Music go@GenericOptions{..} mo@MusicOptions{..}) = do
   error "VK disabled audio API since 2016/11."
@@ -216,23 +217,19 @@ cmd (GroupQ go (GroupOptions{..}))
 
   |not (null g_search_string) = do
 
-    runAPI go $ do
+    (Sized cnt grs) <- groupSearch (tpack g_search_string)
 
-      (Sized cnt grs) <- groupSearch (tpack g_search_string)
-
-      forM_ grs $ \gr -> do
-        liftIO $ printf "%s\n" (gr_format g_output_format gr)
+    forM_ grs $ \gr -> do
+      liftIO $ printf "%s\n" (gr_format g_output_format gr)
 
 cmd (DBQ go (DBOptions{..}))
 
   |db_countries = do
 
-    runAPI go $ do
+    (Sized cnt cs) <- getCountries
 
-      (Sized cnt cs) <- getCountries
-
-      forM_ cs $ \Country{..} -> do
-        liftIO $ Text.putStrLn $ Text.concat [ tshow co_int, "\t",  co_title]
+    forM_ cs $ \Country{..} -> do
+      liftIO $ Text.putStrLn $ Text.concat [ tshow co_int, "\t",  co_title]
 
   |db_cities = do
     error "not implemented"
@@ -240,21 +237,19 @@ cmd (DBQ go (DBOptions{..}))
 cmd (Photo go PhotoOptions{..})
 
   |p_listAlbums = do
-    runAPI go $ do
-      (Sized cnt als) <- getAlbums Nothing
-      forM_ als $ \Album{..} -> do
-        liftIO $ Text.putStrLn $ Text.concat [ tshow al_id, "\t",  al_title]
+    (Sized cnt als) <- getAlbums Nothing
+    forM_ als $ \Album{..} -> do
+      liftIO $ Text.putStrLn $ Text.concat [ tshow al_id, "\t",  al_title]
 
   |p_uploadServer = do
-    runAPI go $ do
-      (Sized cnt als) <- getAlbums Nothing
-      let album = [a | a <- als, al_id a == -7]
-      case album of
-        [a] -> do
-          PhotoUploadServer{..} <- getPhotoUploadServer a
-          liftIO $ Text.putStrLn pus_upload_url
-        _ ->
-          error "Ivalid album"
+    (Sized cnt als) <- getAlbums Nothing
+    let album = [a | a <- als, al_id a == -7]
+    case album of
+      [a] -> do
+        PhotoUploadServer{..} <- getPhotoUploadServer a
+        liftIO $ Text.putStrLn pus_upload_url
+      _ ->
+        error "Ivalid album"
 
   |otherwise = do
     error "invalid command line arguments"

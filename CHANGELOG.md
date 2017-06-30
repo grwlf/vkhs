@@ -1,13 +1,17 @@
-TODO
-----
-* Decrypt 'RepeatedForm' errors
-* Show capchas to users if required
-* Re-implement VK monad as a Free monad special case
-* Runhaskell: handle some standard command line arguments
-* Support storing access-tokens in a temp file
+Version 1.9
+-----------
+
+* Disable Audio API due to upstream changes
+* Handle re-login conditions
+* Handle too-many-requests condition
+* Stop re-exporting `Prelude`, `Imports` provides aliases for popular
+  `Data.Text` functions
+* Cache access token in file
+* Minor fixes
 
 Version 1.7.2
 -------------
+
 * Initial support for runhaskell mode
 
 Version 1.7.1

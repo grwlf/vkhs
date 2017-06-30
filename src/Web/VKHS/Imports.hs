@@ -22,7 +22,6 @@ module Web.VKHS.Imports (
   , module Data.Data
   , module Data.Scientific
   , module Text.Printf
-  , module Prelude
   , module Text.Show.Pretty
   , module Text.Read
   ) where
@@ -47,9 +46,9 @@ import Data.Function (on)
 import Data.Text (Text(..), pack, unpack)
 import Data.Text.IO (putStrLn, hPutStrLn)
 import Data.List (head, length, sortBy, (++))
-import Prelude (error, Integer, FilePath, (==), (.), Show(..), String,
-                ($), IO(..), Bool(..), compare, Ordering(..),
-                Read(..))
+-- import Prelude (error, Integer, FilePath, (==), (.), Show(..), String,
+--                 ($), IO(..), Bool(..), compare, Ordering(..),
+--                 Read(..), error, undefined)
 import Text.Printf
 import Text.Show.Pretty
 import Text.Read (readMaybe)
@@ -61,3 +60,7 @@ tunpack = unpack
 
 tshow :: (Show a) => a -> Text
 tshow = tpack . show
+
+tputStrLn = Data.Text.IO.putStrLn
+thPutStrLn = Data.Text.IO.hPutStrLn
+

@@ -6,9 +6,9 @@ to the stdout. We start from enableing RecordWildCard extension
 > {-# LANGUAGE RecordWildCards #-}
 
 Almost all required modules are re-imported by Web.VKHS.Imports module. Since
-we rely on Text heavily, the Prelude may be disabled.
-
-> import Prelude ()
+we rely on Text heavily, the 'Web.VKHS.Imports' provides aliases for popular
+string functions, having the additional 't' letter: tpack, tunpack, tshow,
+tputStrLn, thputStrLn.
 
 This modules provide the public functionality of VKHS
 
@@ -23,4 +23,4 @@ file.
 > main = runVK_ defaultOptions $ do
 >   Sized cnt cs <- getCountries
 >   forM_ cs $ \Country{..} -> do
->     liftIO $ putStrLn co_title
+>     liftIO $ tputStrLn co_title

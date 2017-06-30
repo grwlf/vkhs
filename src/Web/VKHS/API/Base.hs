@@ -136,11 +136,12 @@ api m args = do
 
 -- | Invoke the request, in case of failure, escalate the probelm to the
 -- supervisor. The superwiser has a chance to change the arguments
-apiR :: (Aeson.FromJSON a, MonadAPI m x s)
+apiRf :: (Aeson.FromJSON b, MonadAPI m x s)
     => MethodName -- ^ API method name
     -> MethodArgs -- ^ API method arguments
+    -> (b -> Either String a)
     -> API m x a
-apiR m0 args0 = go (ReExec m0 args0) where
+apiRf m0 args0 flt = go (ReExec m0 args0) where
   go action = do
     j <- do
       case action of
@@ -149,10 +150,23 @@ apiR m0 args0 = go (ReExec m0 args0) where
         ReParse j -> do
           pure j
     case parseJSON j of
-      (Right (Response _ a)) -> return a
+      (Right (Response _ b)) -> do
+        case flt b of
+          Right a -> return a
+          Left e -> do
+            recovery <- raise (CallFailure (m0, args0, j, e))
+            go recovery
       (Left e) -> do
         recovery <- raise (CallFailure (m0, args0, j, e))
         go recovery
+
+-- | Invoke the request, in case of failure, escalate the probelm to the
+-- supervisor. The superwiser has a chance to change the arguments
+apiR :: (Aeson.FromJSON a, MonadAPI m x s)
+    => MethodName -- ^ API method name
+    -> MethodArgs -- ^ API method arguments
+    -> API m x a
+apiR m0 args0 = apiRf m0 args0 Right
 
 -- | Invoke the request, in case of failure, escalate the probelm to the
 -- supervisor. The superwiser has a chance to change the arguments

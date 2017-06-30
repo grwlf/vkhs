@@ -8,7 +8,7 @@ token, it is possible to call various API methods to -query audio files-
 (disabled by VK) or retrieve wall messages.
 
 Features
-========
+--------
 
 * Provides access to VK API. Interface options include: VK monad and `vkq` command
   line tool.
@@ -20,15 +20,19 @@ Features
   copied into `runhaskell` scripts and tweaked according to ones need.
 * No more dependencies on curlhs/taglib.
 
-Issues
-======
+ToDo
+----
 
+* ~~Decrypt 'RepeatedForm' errors~~
+* ~~Support storing access-tokens in a temp file~~
 * Still no support for captchas, one probably should hack `defaultSupervisor`
   and add them.
-* Network connection timeout is not handled by the coroutine supervisor.
+* Re-implement VK monad as a Free monad special case
+* Runhaskell: handle some standard command line arguments
 * Minor issues here and there. Use `git grep FIXME` to find them
 * File uploading still not functioning.
-* Lots grammatical mistakes. Any corrections will be kindly accepted.
+* Network connection timeout is not handled by the coroutine supervisor.
+* Grammatical mistakes. Any corrections will be kindly accepted.
 
 Installing
 ==========
