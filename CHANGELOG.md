@@ -1,3 +1,7 @@
+Version 1.9.1
+-------------
+* Fixed user photo uploading using `vkq photo`
+
 Version 1.9
 -----------
 

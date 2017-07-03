@@ -30,7 +30,7 @@ ToDo
 * Re-implement VK monad as a Free monad special case
 * Runhaskell: handle some standard command line arguments
 * Minor issues here and there. Use `git grep FIXME` to find them
-* File uploading still not functioning.
+* ~~File uploading still not functioning.~~
 * Network connection timeout is not handled by the coroutine supervisor.
 * Enhance the way `vkq` accepts arguments, support multy-line messages.
 * Grammatical mistakes. Any corrections will be kindly accepted.
