@@ -65,7 +65,7 @@ data Options
 toMaybe :: (Functor f) => f String -> f (Maybe String)
 toMaybe = fmap (\s -> if s == "" then Nothing else Just s)
 
--- FIXME support --version flag
+--    * FIXME support --version flag
 optdesc m =
   let
 

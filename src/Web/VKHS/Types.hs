@@ -100,7 +100,7 @@ newtype AppID = AppID { aid_string :: String }
 
 -- | JSON wrapper.
 --
--- * FIXME  Implement full set of helper functions
+--    * FIXME  Implement full set of helper functions
 data JSON = JSON { js_aeson :: Aeson.Value }
   deriving(Show, Data, Typeable)
 
@@ -138,7 +138,7 @@ data GenericOptions = GenericOptions {
   -- ^ VK user name, (typically, an email). Empty string means no value is given
   , l_password :: String
   -- ^ VK password. Empty string means no value is given
-  -- * FIXME Hide plain-text passwords
+  --    * FIXME Hide plain-text passwords
   , l_access_token :: String
   -- ^ Initial access token, empty means 'not set'. Has higher precedence than
   -- l_access_token_file

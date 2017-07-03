@@ -74,7 +74,7 @@ type API m x a = m (R m x) a
 
 -- | Utility function to parse JSON object
 --
--- * FIXME Don't raise exception, simply return `Left err`
+--    * FIXME Don't raise exception, simply return `Left err`
 decodeJSON :: (MonadAPI m x s)
     => ByteString
     -> API m x JSON
@@ -89,9 +89,9 @@ decodeJSON bs = do
 -- <https://vk.com/dev/methods>
 -- <https://vk.com/dev/json_schema>
 --
--- * FIXME We currentyl use Text.unpack to encode text into strings. Use encodeUtf8
---   FIXME instead.
--- * FIXME Split into request builder and request executer
+--    * FIXME We currentyl use Text.unpack to encode text into strings. Use encodeUtf8
+--      FIXME instead.
+--    * FIXME Split into request builder and request executer
 apiJ :: (MonadAPI m x s)
     => String
     -- ^ API method name

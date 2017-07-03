@@ -31,8 +31,8 @@ type R t a = Result t a
 -- needs to track two types: the early break @t@ and the current result @a@.
 -- In order to be runnable (e.g. by 'runVK') both types are need to be the same.
 --
--- * FIXME re-implement the concept using `Monad.Free` library
--- * FIMXE clean out of test/unused constructors
+--    * FIXME re-implement the concept using `Monad.Free` library
+--    * FIMXE clean out of test/unused constructors
 data Result t a =
     Fine a
   -- ^ The normal exit of a computation

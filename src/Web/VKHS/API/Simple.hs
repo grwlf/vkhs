@@ -128,8 +128,7 @@ getCurrentUser = do
       True -> Right (head users)
 
 
--- * FIXME fix setUserPhoto, it is not actually working
--- * FIXME move low-level upload code to API.Base
+--    * FIXME move low-level upload code to API.Base
 setUserPhoto :: (MonadAPI m x s) => UserRecord -> FilePath -> API m x ()
 setUserPhoto UserRecord{..} photo_path =  do
   OwnerUploadServer{..} <-

@@ -76,7 +76,7 @@ type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
 --
 -- See also 'runVK' and 'defaultSupervisor`.
 --
--- * FIXME Re-write using modern 'Monad.Free'
+--    * FIXME Re-write using modern 'Monad.Free'
 newtype VK r a = VK { unVK :: Guts VK (StateT State (ExceptT Text IO)) r a }
   deriving(MonadIO, Functor, Applicative, Monad, MonadState State, MonadReader (r -> VK r r) , MonadCont)
 
@@ -96,9 +96,9 @@ stepVK m = runContT (runReaderT (unVK (VKHS.catch m)) undefined) return
 --
 -- See also 'runVK'
 --
--- * FIXME Store known answers in external DB (in file?) instead of LoginState
---   FIXME dictionary
--- * FIXME Handle capthas (offer running standalone apps)
+--    * FIXME Store known answers in external DB (in file?) instead of LoginState
+--      FIXME dictionary
+--    * FIXME Handle capthas (offer running standalone apps)
 defaultSupervisor :: (Show a) => VK (R VK a) (R VK a) -> StateT State (ExceptT Text IO) a
 defaultSupervisor = go where
   go m = do
