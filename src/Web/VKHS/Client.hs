@@ -34,6 +34,7 @@ import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 
 import Network.HTTP.Client ()
+import qualified Network.HTTP.Client.MultipartFormData as Multipart
 import Network.HTTP.Client.Internal (setUri)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified Network.HTTP.Types as Client
@@ -219,7 +220,7 @@ requestCreatePost (FilledForm tit Shpider.Form{..}) c = do
 -- * FIXME This function is not working. Looks like VK requires some other
 --   FIXME method rather than urlEncodedBody.
 -- * FIXME Use 'URL' rather than Text
-requestUploadPhoto :: (MonadClient m s) => Text -> ByteString -> m (Either Error Request)
+requestUploadPhoto :: (MonadClient m s) => Text -> String -> m (Either Error Request)
 requestUploadPhoto text_url bs = do
   case Client.parseURI (Text.unpack text_url) of
     Nothing -> return (Left (ErrorParseURL (Text.unpack text_url) "parseURI failed"))
@@ -229,7 +230,8 @@ requestUploadPhoto text_url bs = do
         Left err -> do
           return $ Left err
         Right Request{..} -> do
-          return $ Right $ Request ((Client.urlEncodedBody [("photo", bs)]) req) req_jar
+          req' <- Multipart.formDataBody [Multipart.partFile "photo" bs] req
+          return $ Right $ Request req' req_jar
 
 data Response = Response {
     resp :: Client.Response (Pipes.Producer ByteString IO ())
@@ -299,4 +301,3 @@ downloadFileWith url h = do
   (Right Request{..}) <- requestCreateGet url (cookiesCreate ())
   liftIO $ Pipes.withHTTP req cl_man $ \resp -> do
       PP.foldM (\() a -> h a) (return ()) (const (return ())) (Client.responseBody resp)
-
