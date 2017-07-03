@@ -47,6 +47,8 @@ data LoginOptions = LoginOptions {
 data PhotoOptions = PhotoOptions {
     p_listAlbums :: Bool
   , p_uploadServer :: Bool
+  , p_setUserPhoto :: Bool
+  , p_userPhoto :: String
   } deriving(Show)
 
 data Options
@@ -160,6 +162,8 @@ optdesc m =
     <> command "photo" (info ( Photo <$> genericOptions <*> (PhotoOptions
       <$> flag False True (long "list-albums" <> help "List Albums")
       <*> flag False True (long "upload-server" <> help "Get upload server")
+      <*> flag False True (long "set-user-photo" <> help "Set user photo")
+      <*> strOption (long "photo" <> help "User photo to set" <> value "")
       ))
       ( progDesc "Photo-related queries"))
     )
@@ -251,6 +255,9 @@ cmd (Photo go PhotoOptions{..})
       _ ->
         error "Ivalid album"
 
+  |p_setUserPhoto = do
+    user <- getCurrentUser
+    setUserPhoto user p_userPhoto
+
   |otherwise = do
     error "invalid command line arguments"
-

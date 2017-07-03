@@ -132,11 +132,10 @@ getCurrentUser = do
 -- * FIXME move low-level upload code to API.Base
 setUserPhoto :: (MonadAPI m x s) => UserRecord -> FilePath -> API m x ()
 setUserPhoto UserRecord{..} photo_path =  do
-  photo <- liftIO $ BS.readFile photo_path
   OwnerUploadServer{..} <-
     resp_data <$> api "photos.getOwnerPhotoUploadServer"
       [("owner_id", tshow ur_id)]
-  req <- ensure $ requestUploadPhoto ous_upload_url photo
+  req <- ensure $ requestUploadPhoto ous_upload_url photo_path
   (res, _) <- requestExecute req
   j@JSON{..} <- decodeJSON (responseBody res)
   liftIO $ BS.putStrLn $ (responseBody res)
@@ -150,6 +149,3 @@ setUserPhoto UserRecord{..} photo_path =  do
       ,("photo", upl_photo)]
   PhotoSaveResult{..} <- pure resp_data
   return ()
-
-
-
