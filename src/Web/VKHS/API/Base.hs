@@ -36,7 +36,6 @@ import Web.VKHS.Types
 import Web.VKHS.Client hiding (Response(..))
 import Web.VKHS.Monad
 import Web.VKHS.Error
-import Web.VKHS.API.Types
 
 import Debug.Trace
 
@@ -58,11 +57,14 @@ class ToGenericOptions s => ToAPIState s where
 -- See also 'readInitialAccessToken'
 modifyAccessToken :: (MonadIO m, MonadState s m, ToAPIState s) => AccessToken -> m ()
 modifyAccessToken at@AccessToken{..} = do
+  debug $ "Modifying access token, new value: " <> tshow at
   modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
   GenericOptions{..} <- getGenericOptions
   case l_access_token_file of
     [] -> return ()
-    fl -> liftIO $ writeFile l_access_token_file (show at)
+    fl -> do
+      debug $ "Writing access token to file '" <> tpack l_access_token_file <> "'"
+      liftIO $ writeFile l_access_token_file (show at)
   return ()
 
 -- | Class of monads able to run VK API calls. @m@ - the monad itself, @x@ -
@@ -120,7 +122,7 @@ apiJ mname (map (id *** tunpack) -> margs) = do
 
 
 -- | Invoke the request, return answer as a Haskell datatype. On error fall out
--- to the supervizer (e.g. @VKHS.defaultSuperviser@) without possibility to
+-- to the supervisor (e.g. @VKHS.defaultSuperviser@) without possibility to
 -- continue
 api :: (Aeson.FromJSON a, MonadAPI m x s)
     => String
@@ -135,11 +137,14 @@ api m args = do
     Left e -> terminate (JSONParseFailure' j e)
 
 -- | Invoke the request, in case of failure, escalate the probelm to the
--- supervisor. The superwiser has a chance to change the arguments
+-- supervisor. The supervisor has a chance to change the arguments.
 apiRf :: (Aeson.FromJSON b, MonadAPI m x s)
     => MethodName -- ^ API method name
     -> MethodArgs -- ^ API method arguments
     -> (b -> Either String a)
+                  -- ^ A filter function, able to change the return value
+                  -- inplace. Returing Left will instruct the coroutine to exit
+                  -- to the supervisor
     -> API m x a
 apiRf m0 args0 flt = go (ReExec m0 args0) where
   go action = do
@@ -152,7 +157,8 @@ apiRf m0 args0 flt = go (ReExec m0 args0) where
     case parseJSON j of
       (Right (Response _ b)) -> do
         case flt b of
-          Right a -> return a
+          Right a -> do
+            return a
           Left e -> do
             recovery <- raise (CallFailure (m0, args0, j, e))
             go recovery
@@ -174,6 +180,10 @@ apiHM :: forall m x a s . (Aeson.FromJSON a, MonadAPI m x s)
     => MethodName -- ^ API method name
     -> MethodArgs -- ^ API method arguments
     -> (ErrorRecord -> API m x (Maybe a))
+                  -- ^ Error handler, allowing user to correct possible error
+                  -- returned by VK. (Just value) continues the execution,
+                  -- Nothing results in exit from the corouting to the
+                  -- supervisor.
     -> API m x a
 apiHM m0 args0 handler = go (ReExec m0 args0) where
   go action = do
@@ -209,6 +219,10 @@ apiH :: forall m x a s . (Aeson.FromJSON a, MonadAPI m x s)
     => MethodName -- ^ API method name
     -> MethodArgs -- ^ API method arguments
     -> (ErrorRecord -> Maybe a)
+                  -- ^ Error handler, allowing user to correct possible error
+                  -- returned by VK. (Just value) continues the execution,
+                  -- Nothing results in exit from the corouting to the
+                  -- supervisor.
     -> API m x a
 apiH m args handler = apiHM m args (\e -> pure (handler e) :: API m x (Maybe a))
 

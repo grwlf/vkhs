@@ -100,8 +100,11 @@ readInitialAccessToken =
   GenericOptions{..} <- getGenericOptions
   case l_access_token of
    [] -> do
+    debug "Initial access token is empty"
     case l_access_token_file of
-      [] -> return Nothing
+      [] -> do
+        debug "No access token file specified"
+        return Nothing
       fl -> do
         safeReadFile l_access_token_file >>= \case
           Just txt -> do
@@ -109,6 +112,7 @@ readInitialAccessToken =
               Just at -> return (Just at)
               Nothing -> return (str2at txt)
           Nothing -> do
+            debug $ "Unable to read access token from file '" <> tpack l_access_token_file <> "'"
             return Nothing
    _ -> do
     return (str2at l_access_token)

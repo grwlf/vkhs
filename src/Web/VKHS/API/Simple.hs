@@ -104,6 +104,18 @@ getGroupWall GroupRecord{..} =
           return Nothing
         :: API m x (Maybe (Sized [WallRecord])))
 
+
+getWallById :: (MonadAPI m x s) => Text -> API m x (Maybe WallRecord)
+getWallById id = do
+  listToMaybe <$> do
+  apiSimpleH "wall.getById"
+    [("posts", id)
+    ]
+    (\ErrorRecord{..} ->
+      case er_code of
+        _ -> Nothing
+    )
+
 -- TODO: Take User as argument for more type-safety
 getAlbums :: (MonadAPI m x s) => Maybe Integer -> API m x (Sized [Album])
 getAlbums muid =

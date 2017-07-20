@@ -184,7 +184,8 @@ runAPI go@GenericOptions{..} m = do
   flip evalStateT s $ do
 
     readInitialAccessToken >>= \case
-      Nothing ->
+      Nothing -> do
+        debug "No initial access token was read"
         return ()
       Just at -> do
         modifyAccessToken at

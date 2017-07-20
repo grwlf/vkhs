@@ -132,6 +132,9 @@ data WallRecord = WallRecord
   , wr_from_id :: Int
   , wr_text :: Text
   , wr_date :: Int
+  , wr_posttype :: Text
+  , wr_attachments_json :: Maybe JSON
+  , wr_copy_history_json :: Maybe JSON
   } deriving (Show)
 
 instance FromJSON WallRecord where
@@ -141,6 +144,9 @@ instance FromJSON WallRecord where
       <*> (o .: "from_id")
       <*> (o .: "text")
       <*> (o .: "date")
+      <*> (o .: "post_type")
+      <*> (o .:? "attachments")
+      <*> (o .:? "copy_history")
 
 publishedAt :: WallRecord -> UTCTime
 publishedAt wr = posixSecondsToUTCTime $ fromIntegral $ wr_date wr
