@@ -163,7 +163,11 @@ apiJ mname (map (id *** tunpack) -> margs) = do
 
   req <- ensure (requestCreateGet url (cookiesCreate ()))
   (res, jar') <- requestExecute req
-  decodeJSON (responseBody res)
+  res <- decodeJSON (responseBody res)
+
+  debug $ "< " <> jsonEncodePretty res
+
+  return res
 
 
 -- | Invoke the request, return answer as a Haskell datatype. On error fall out

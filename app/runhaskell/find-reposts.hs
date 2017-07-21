@@ -21,6 +21,9 @@ wallDesc WallRecord{..} = (wr_owner_id,wr_id)
 printUrl :: (MonadIO m) => WallDescriptor -> m ()
 printUrl (o,i) = tputStrLn $ "https://vk.com/im?w=wall" <> tshow o <> "_" <> tshow i
 
+makeUrl :: WallDescriptor -> Text
+makeUrl (o,i) = "https://vk.com/im?w=wall" <> tshow o <> "_" <> tshow i
+
 whileM :: (Monad m) => m Bool -> m ()
 whileM m = do
   x <- m
@@ -30,38 +33,38 @@ whileM m = do
 
 -- FIXME: return many invalid posts
 main :: IO ()
-main = runVK_ defaultOptions { o_verbose = True} $ do
+main = runVK_ defaultOptions { o_verbose = False} $ do
 
   Just wr0 <- getWallById post_id
 
-  st <- do
+  flip execStateT (HashSet.empty, [post_id]) $ do
 
-    flip execStateT (HashSet.empty, [post_id]) $ do
+    whileM $ do
 
-      whileM $ do
+      (visited,frontier) <- get
 
-        (visited,frontier) <- get
+      case frontier of
+        [] -> return True {- break -}
+        (pid:frontier1) -> do
 
-        case frontier of
-          [] -> return True {- break -}
-          (pid:frontier1) -> do
-            mwr <- lift $ getWallById pid
-            case mwr of
-              Nothing -> do
-                put (visited, frontier1)
-                return True
-              Just wr -> do
-                wr1 <- map wallDesc <$> pure (wr_copy_history wr)
-                wr2 <- map wallDesc <$> rr_items <$> (lift $ getWallReposts wr)
+          tputStrLn $ makeUrl pid
+          mwr <- lift $ getWallById pid
 
-                frontier2 <- pure $
-                  HashSet.toList (HashSet.fromList (wr1 <> wr2) `HashSet.difference` visited)
+          case mwr of
+            Nothing -> do
+              put (visited, frontier1)
+              return True
 
-                put ( HashSet.insert (wallDesc wr) visited
-                    , frontier1 <> frontier2)
+            Just wr -> do
+              wr1 <- map wallDesc <$> pure (wr_copy_history wr)
+              wr2 <- map wallDesc <$> rr_items <$> (lift $ getWallReposts wr)
 
-                return False
+              frontier2 <- pure $
+                HashSet.toList (HashSet.fromList (wr1 <> wr2) `HashSet.difference` visited)
 
-  forM_ (fst st) printUrl
+              put ( HashSet.insert (wallDesc wr) visited
+                  , frontier1 <> frontier2)
+
+              return False
 
 

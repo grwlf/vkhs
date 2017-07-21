@@ -120,7 +120,7 @@ instance FromJSON WallRecord where
     WallRecord
       <$> (o .: "id")
       <*> (o .: "from_id")
-      <*> (fromMaybe (-1) <$> (o .:? "owner_id"))
+      <*> (o .: "owner_id" <|> o .: "to_id")
       <*> (o .: "text")
       <*> (o .: "date")
       <*> (o .: "post_type")
