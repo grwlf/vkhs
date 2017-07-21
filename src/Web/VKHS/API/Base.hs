@@ -1,3 +1,6 @@
+{-| Definitions of basic API types such as Response and Error, definitions of
+ - various API-caller functions -}
+
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
@@ -7,29 +10,20 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Web.VKHS.API.Base where
 
 import Data.Time
-import Control.Applicative
-import Control.Monad
-import Control.Monad.State
-import Control.Monad.Writer
-import Control.Monad.Cont
-import Control.Exception (catch, SomeException)
 
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
-import Data.ByteString.Lazy (fromStrict,toChunks)
 import qualified Data.ByteString.Char8 as BS
 
-import Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.Aeson.Encode.Pretty as Aeson
-
-import Text.Printf
-import Text.Read (readMaybe)
 
 import Web.VKHS.Imports
 import Web.VKHS.Types
@@ -39,6 +33,56 @@ import Web.VKHS.Error
 
 import Debug.Trace
 
+-- | VK Response representation
+data Response a = Response {
+    resp_json :: JSON
+    -- ^ Original JSON representation of the respone, as received from the VK
+  , resp_data :: a
+    -- ^ Haskell ADT representation of the response
+  } deriving (Show, Functor, Data, Typeable)
+
+emptyResponse :: (Monoid a) => Response a
+emptyResponse = Response (JSON $ Aeson.object []) mempty
+
+parseJSON_obj_error :: String -> Aeson.Value -> Aeson.Parser a
+parseJSON_obj_error name o = fail $
+  printf "parseJSON: %s expects object, got %s" (show name) (show o)
+
+instance (FromJSON a) => FromJSON (Response a) where
+  parseJSON j = Aeson.withObject "Response" (\o ->
+    Response <$> pure (JSON j) <*> (o .: "error" <|> o .: "response")) j
+
+-- | Wrapper for common error codes returned by the VK API
+data ErrorCode =
+    AccessDenied
+  | NotLoggedIn
+  | TooManyRequestsPerSec
+  | ErrorCode Scientific
+  -- ^ Other codes go here
+  deriving(Show,Read, Eq, Ord)
+
+instance FromJSON ErrorCode where
+  parseJSON = Aeson.withScientific "ErrorCode" $ \n ->
+    case n of
+      5 -> return NotLoggedIn
+      6 -> return TooManyRequestsPerSec
+      15 -> return AccessDenied
+      x -> return (ErrorCode x)
+
+-- | Top-level error description, returned by VK API
+data ErrorRecord = ErrorRecord
+  { er_code :: ErrorCode
+  , er_msg :: Text
+  } deriving(Show)
+
+instance FromJSON ErrorRecord where
+  parseJSON = Aeson.withObject "ErrorRecord" $ \o ->
+    ErrorRecord
+      <$> (o .: "error_code")
+      <*> (o .: "error_msg")
+
+
+-- | State of the API engine
 data APIState = APIState {
     api_access_token :: String
   } deriving (Show)
@@ -51,8 +95,8 @@ class ToGenericOptions s => ToAPIState s where
   toAPIState :: s -> APIState
   modifyAPIState :: (APIState -> APIState) -> (s -> s)
 
--- | Modifies VK access token in the internal state as well as in the external
--- storage, if enabled.
+-- | Modify VK access token in the internal state and its external mirror
+-- if enabled, if any.
 --
 -- See also 'readInitialAccessToken'
 modifyAccessToken :: (MonadIO m, MonadState s m, ToAPIState s) => AccessToken -> m ()
@@ -72,9 +116,10 @@ modifyAccessToken at@AccessToken{..} = do
 class (MonadIO (m (R m x)), MonadClient (m (R m x)) s, ToAPIState s, MonadVK (m (R m x)) (R m x)) =>
   MonadAPI m x s | m -> s
 
+-- | Short alias for the coroutine monad
 type API m x a = m (R m x) a
 
--- | Utility function to parse JSON object
+-- | Utility function to parse ByteString into JSON object
 --
 --    * FIXME Don't raise exception, simply return `Left err`
 decodeJSON :: (MonadAPI m x s)
@@ -124,6 +169,7 @@ apiJ mname (map (id *** tunpack) -> margs) = do
 -- | Invoke the request, return answer as a Haskell datatype. On error fall out
 -- to the supervisor (e.g. @VKHS.defaultSuperviser@) without possibility to
 -- continue
+{-# DEPRECATED api "Consider using safer apiH-family functions" #-}
 api :: (Aeson.FromJSON a, MonadAPI m x s)
     => String
     -- ^ API method name
@@ -182,8 +228,7 @@ apiHM :: forall m x a s . (Aeson.FromJSON a, MonadAPI m x s)
     -> (ErrorRecord -> API m x (Maybe a))
                   -- ^ Error handler, allowing user to correct possible error
                   -- returned by VK. (Just value) continues the execution,
-                  -- Nothing results in exit from the corouting to the
-                  -- supervisor.
+                  -- Nothing exits from the coroutine to the supervisor.
     -> API m x a
 apiHM m0 args0 handler = go (ReExec m0 args0) where
   go action = do
@@ -226,16 +271,19 @@ apiH :: forall m x a s . (Aeson.FromJSON a, MonadAPI m x s)
     -> API m x a
 apiH m args handler = apiHM m args (\e -> pure (handler e) :: API m x (Maybe a))
 
--- Encode JSON back to string
+-- | Encode JSON to strict Char8 ByteStirng
 jsonEncodeBS :: JSON -> ByteString
 jsonEncodeBS JSON{..} = BS.concat $ toChunks $ Aeson.encode js_aeson
 
+-- | Encode JSON to Text
 jsonEncode :: JSON -> Text
 jsonEncode JSON{..} = Text.decodeUtf8 $ BS.concat $ toChunks $ Aeson.encode js_aeson
 
+-- | Encode JSON to strict Char8 ByteString using pretty-style formatter
 jsonEncodePrettyBS :: JSON -> ByteString
 jsonEncodePrettyBS JSON{..} = BS.concat $ toChunks $ Aeson.encodePretty js_aeson
 
+-- | Encode JSON to Text using pretty-style formatter
 jsonEncodePretty :: JSON -> Text
 jsonEncodePretty JSON{..} = Text.decodeUtf8 $ BS.concat $ toChunks $ Aeson.encodePretty js_aeson
 

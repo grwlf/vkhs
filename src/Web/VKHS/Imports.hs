@@ -1,4 +1,4 @@
--- | This module re-imports common declarations used across the VKHS
+-- | This module re-imports common declarations used across the VKHS library
 module Web.VKHS.Imports (
     module Web.VKHS.Imports
   , module Control.Arrow
@@ -6,6 +6,7 @@ module Web.VKHS.Imports (
   , module Control.Applicative
   , module Control.Monad
   , module Control.Monad.Trans
+  , module Control.Monad.State
   , module Control.Exception
   , module Data.Aeson
   , module Data.ByteString.Char8
@@ -31,6 +32,7 @@ import Control.Category ((>>>))
 import Control.Applicative ((<$>), (<*>), (<|>), pure)
 import Control.Monad
 import Control.Monad.Trans
+import Control.Monad.State
 import Control.Exception (SomeException(..),try,catch,bracket)
 import Data.Aeson ((.=), (.:), (.:?), (.!=), FromJSON)
 import Data.Typeable
@@ -46,12 +48,10 @@ import Data.Function (on)
 import Data.Text (Text(..), pack, unpack)
 import Data.Text.IO (putStrLn, hPutStrLn)
 import Data.List (head, length, sortBy, (++))
--- import Prelude (error, Integer, FilePath, (==), (.), Show(..), String,
---                 ($), IO(..), Bool(..), compare, Ordering(..),
---                 Read(..), error, undefined)
 import Text.Printf
 import Text.Show.Pretty
 import Text.Read (readMaybe)
+import System.IO (Handle)
 
 tpack :: String -> Text
 tpack = pack
@@ -61,6 +61,9 @@ tunpack = unpack
 tshow :: (Show a) => a -> Text
 tshow = tpack . show
 
-tputStrLn = Data.Text.IO.putStrLn
-thPutStrLn = Data.Text.IO.hPutStrLn
+tputStrLn :: MonadIO m => Text -> m ()
+tputStrLn t = liftIO $ Data.Text.IO.putStrLn t
+
+thPutStrLn :: MonadIO m => Handle -> Text -> m ()
+thPutStrLn h t = liftIO $ Data.Text.IO.hPutStrLn h t
 

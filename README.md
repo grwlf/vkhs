@@ -59,11 +59,18 @@ Developing using Nix
 The author of this project uses [Nix](http://nixos.org) as a main development
 platform. The `default.nix` file contain Nix expression describing the environment
 
-#### Entering Nix shell environment
+#### Developing via Nix shell environment
 
     $ git clone https://github.com/grwlf/vkhs
     $ cd vkhs
-    $ nix-shell
+    $ nix-shell         # Entering NIX development shell
+    # ./ghci.sh         # GHCI wrapper script
+    > :lo Main          # Usual development
+    > ^D
+    # cabal install     # Shell provides access to cabal
+    # cabal sdist
+    # ^D
+    $ ...
 
 #### Usual development
 

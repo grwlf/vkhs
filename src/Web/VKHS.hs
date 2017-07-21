@@ -42,27 +42,27 @@ import qualified Web.VKHS.API as API
 
 -- | Main state of the VK monad stack. Consists of lesser states plus a copy of
 -- generic options provided by the caller.
-data State = State {
+data VKState = VKState {
     cs :: ClientState
   , ls :: LoginState
   , as :: APIState
   , go :: GenericOptions
   }
 
-instance ToLoginState State where
+instance ToLoginState VKState where
   toLoginState = ls
   modifyLoginState f = \s -> s { ls = f (ls s) }
-instance ToClientState State where
+instance ToClientState VKState where
   toClientState = cs
   modifyClientState f = \s -> s { cs = f (cs s) }
-instance API.ToAPIState State where
+instance API.ToAPIState VKState where
   toAPIState = as
   modifyAPIState f = \s -> s { as = f (as s) }
-instance ToGenericOptions State where
+instance ToGenericOptions VKState where
   toGenericOptions = go
 
-initialState :: (MonadIO m) => GenericOptions -> m State
-initialState go = State
+initialState :: (MonadIO m) => GenericOptions -> m VKState
+initialState go = VKState
   <$> liftIO (Client.defaultState go)
   <*> pure (Login.defaultState go)
   <*> pure (API.defaultState)
@@ -70,24 +70,24 @@ initialState go = State
 
 type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
 
--- | Main VK monad able to track errors, track full state 'State', set
+-- | Main VK monad able to track errors, track full state 'VKState', set
 -- early exit by the means of continuation monad. VK encodes a coroutine which
 -- has entry points defined by 'Result' datatype.
 --
 -- See also 'runVK' and 'defaultSupervisor`.
 --
 --    * FIXME Re-write using modern 'Monad.Free'
-newtype VK r a = VK { unVK :: Guts VK (StateT State (ExceptT Text IO)) r a }
-  deriving(MonadIO, Functor, Applicative, Monad, MonadState State, MonadReader (r -> VK r r) , MonadCont)
+newtype VK r a = VK { unVK :: Guts VK (StateT VKState (ExceptT Text IO)) r a }
+  deriving(MonadIO, Functor, Applicative, Monad, MonadState VKState, MonadReader (r -> VK r r) , MonadCont)
 
-instance MonadClient (VK r) State
+instance MonadClient (VK r) VKState
 instance MonadVK (VK r) r
-instance MonadLogin (VK r) r State
-instance MonadAPI VK r State
+instance MonadLogin (VK r) r VKState
+instance MonadAPI VK r VKState
 
 -- | Run the VK coroutine till next return. Consider using 'runVK' for full
 -- spinup.
-stepVK :: VK r r -> StateT State (ExceptT Text IO) r
+stepVK :: VK r r -> StateT VKState (ExceptT Text IO) r
 stepVK m = runContT (runReaderT (unVK (VKHS.catch m)) undefined) return
 
 -- | Run VK monad @m@ and handle continuation requests using default
@@ -99,7 +99,7 @@ stepVK m = runContT (runReaderT (unVK (VKHS.catch m)) undefined) return
 --    * FIXME Store known answers in external DB (in file?) instead of LoginState
 --      FIXME dictionary
 --    * FIXME Handle capthas (offer running standalone apps)
-defaultSupervisor :: (Show a) => VK (R VK a) (R VK a) -> StateT State (ExceptT Text IO) a
+defaultSupervisor :: (Show a) => VK (R VK a) (R VK a) -> StateT VKState (ExceptT Text IO) a
 defaultSupervisor = go where
   go m = do
     GenericOptions{..} <- toGenericOptions <$> get

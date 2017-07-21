@@ -1,7 +1,7 @@
--- | This module contains definitions of VK various API bindings. I tried to
--- keep it as simple as possible. More, the user is expected to copy any
--- function from this module into their 'runhaskell' script and customize
--- as required.
+-- | This module contains definitions of various VK API bindings. It is desigend
+-- to be as simple as possible. The collection is not even close to be complete.
+-- The user is expected to copy-and-paste any function from this module into
+-- their 'runhaskell' script and customize it as required.
 --
 -- Runhaskell script may looks like the following:
 -- @
@@ -24,7 +24,8 @@
 --           liftIO $ tputStrLn "--------------"
 -- @
 --
--- See more scripts under @./app/runhaskell@ folder
+-- See also a collection of scripts in the @./app/runhaskell@ folder of
+-- the distribution package.
 --
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
@@ -50,13 +51,14 @@ max_count = 1000
 -- | We are using API v5.44 by default
 ver = "5.44"
 
+-- | Versioned aliases for api caller functions
 apiSimpleF nm args f = apiRf nm (("v",ver):args) f
 apiSimple nm args = apiR nm (("v",ver):args)
 apiSimpleH nm args handler = apiH nm (("v",ver):args) handler
 apiSimpleHM nm args handler = apiHM nm (("v",ver):args) handler
-apiVer nm args = api nm (("v",ver):args)
 
--- | This function demonstrates pure-functional error handling
+-- | Wrapper for 'groups.search' handler. The function demonstrates
+-- pure-functional error handling.
 groupSearch :: (MonadAPI m x s) => Text -> API m x (Sized [GroupRecord])
 groupSearch q =
   fmap (sortBy (compare `on` gr_members_count)) <$> do
@@ -70,6 +72,7 @@ groupSearch q =
         _ -> Nothing
     )
 
+-- | Get list of countries, known to VK
 getCountries :: (MonadAPI m x s) => API m x (Sized [Country])
 getCountries =
   fmap (sortBy (compare `on` co_title)) <$> do
@@ -79,6 +82,7 @@ getCountries =
      ("count", tpack (show max_count))
     ]
 
+-- | Get list of country cities, known to VK
 getCities :: (MonadAPI m x s) => Country -> Maybe Text -> API m x (Sized [City])
 getCities Country{..} mq =
   apiSimple "database.getCities" $
@@ -87,8 +91,7 @@ getCities Country{..} mq =
     ] ++
     maybe [] (\q -> [("q",q)]) mq
 
--- | See [https://vk.com/dev/wall.get]
---
+-- | Wrapper for [https://vk.com/dev/wall.get] function
 -- This function demonstrates monadic error handling
 getGroupWall :: forall m x s . (MonadAPI m x s) => GroupRecord -> API m x (Sized [WallRecord])
 getGroupWall GroupRecord{..} =
@@ -105,16 +108,26 @@ getGroupWall GroupRecord{..} =
         :: API m x (Maybe (Sized [WallRecord])))
 
 
-getWallById :: (MonadAPI m x s) => Text -> API m x (Maybe WallRecord)
-getWallById id = do
+-- | https://vk.com/dev/wall.getById
+getWallById :: (MonadAPI m x s) => (Int, Int) -> API m x (Maybe WallRecord)
+getWallById (owner_id, post_id) = do
   listToMaybe <$> do
   apiSimpleH "wall.getById"
-    [("posts", id)
+    [("posts", tshow owner_id <> "_" <> tshow post_id)
     ]
     (\ErrorRecord{..} ->
       case er_code of
         _ -> Nothing
     )
+
+-- | https://vk.com/dev/wall.getReposts
+getWallReposts :: (MonadAPI m x s) => WallRecord -> API m x RepostRecord
+getWallReposts WallRecord{..} = do
+  apiSimple "wall.getReposts" $
+    [ ("owner_id",tshow wr_owner_id)
+    , ("post_id",tshow wr_id)
+    , ("count",tshow 1000)
+    ]
 
 -- TODO: Take User as argument for more type-safety
 getAlbums :: (MonadAPI m x s) => Maybe Integer -> API m x (Sized [Album])
@@ -132,11 +145,12 @@ getPhotoUploadServer Album{..} =
   apiSimple "photos.getUploadServer" [("album_id", tshow al_id)]
 
 
+-- | Get current user
 getCurrentUser :: (MonadAPI m x s) => API m x UserRecord
 getCurrentUser = do
   apiSimpleF "users.get" [] $ \users ->
     case (length users == 1) of
-      False -> Left "getCurrentUser: array with one user record"
+      False -> Left "getCurrentUser: should be and array containing a single ser record"
       True -> Right (head users)
 
 
@@ -160,3 +174,4 @@ setUserPhoto UserRecord{..} photo_path =  do
       ,("photo", upl_photo)]
   PhotoSaveResult{..} <- pure resp_data
   return ()
+

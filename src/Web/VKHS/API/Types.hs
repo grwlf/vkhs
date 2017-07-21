@@ -1,6 +1,8 @@
--- | This module contains base VK API types
+-- | This module contains wrappers for common API data types. The collection is
+-- incomplete and may be out of date, since API is evolving constantly. Users
+-- should consider extending this set by their own per-task definitions.
 --
--- See [VK development docs](https://vk.com/dev) for the details
+-- See [VK development docs](https://vk.com/dev) for the official documentation
 --
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -23,23 +25,9 @@ import Web.VKHS.Imports
 import Web.VKHS.Error
 import Web.VKHS.Types
 
-data Response a = Response {
-    resp_json :: JSON
-  , resp_data :: a
-  } deriving (Show, Functor, Data, Typeable)
+import Web.VKHS.API.Base
 
-emptyResponse :: (Monoid a) => Response a
-emptyResponse = Response (JSON $ Aeson.object []) mempty
-
-parseJSON_obj_error :: String -> Aeson.Value -> Aeson.Parser a
-parseJSON_obj_error name o = fail $
-  printf "parseJSON: %s expects object, got %s" (show name) (show o)
-
-instance (FromJSON a) => FromJSON (Response a) where
-  parseJSON j = Aeson.withObject "Response" (\o ->
-    Response <$> pure (JSON j) <*> (o .: "error" <|> o .: "response")) j
-
--- | DEPRECATED, use @Sized@ instead
+{-# DEPRECATED SizedList "a) Use Sized instead. b) newer API verison may not need this" #-}
 data SizedList a = SizedList Int [a]
   deriving(Show, Data, Typeable)
 
@@ -49,6 +37,7 @@ instance (FromJSON a) => FromJSON (SizedList a) where
     t <- Aeson.parseJSON (Aeson.Array (Vector.tail v))
     return (SizedList n t)
 
+{-# DEPRECATED MusicRecord "music API was disabled by VK, unfortunately" #-}
 data MusicRecord = MusicRecord
   { mr_id :: Int
   , mr_owner_id :: Int
@@ -75,6 +64,20 @@ instance FromJSON MusicRecord where
  -}
 
 
+data RepostRecord = RepostRecord {
+    rr_items :: [WallRecord]
+  , rr_groups :: [GroupRecord]
+  , rr_profiles :: [UserRecord]
+  }
+  deriving (Show, Data, Typeable)
+
+instance FromJSON RepostRecord where
+  parseJSON = Aeson.withObject "RepostRecord" $ \o ->
+    RepostRecord
+      <$> (o .: "items")
+      <*> (o .: "groups")
+      <*> (o .: "profiles")
+
 data UserRecord = UserRecord
   { ur_id :: Integer
   , ur_first_name :: Text
@@ -98,55 +101,31 @@ instance FromJSON UserRecord where
       <*> (o .:? "deactivated")
       <*> (o .:? "hidden")
 
-data ErrorCode =
-    AccessDenied
-  | NotLoggedIn
-  | TooManyRequestsPerSec
-  | ErrorCode Scientific
-  deriving(Show,Read, Eq, Ord)
-
-instance FromJSON ErrorCode where
-  parseJSON = Aeson.withScientific "ErrorCode" $ \n ->
-    case n of
-      5 -> return NotLoggedIn
-      6 -> return TooManyRequestsPerSec
-      15 -> return AccessDenied
-      x -> return (ErrorCode x)
-
-data ErrorRecord = ErrorRecord
-  { er_code :: ErrorCode
-  , er_msg :: Text
-  } deriving(Show)
-
-instance FromJSON ErrorRecord where
-  parseJSON = Aeson.withObject "ErrorRecord" $ \o ->
-    ErrorRecord
-      <$> (o .: "error_code")
-      <*> (o .: "error_msg")
-
 -- | Wall post representation (partial)
 --
 -- See also https://vk.com/dev/objects/post
 data WallRecord = WallRecord
   { wr_id :: Int
   , wr_from_id :: Int
+  , wr_owner_id :: Int
   , wr_text :: Text
   , wr_date :: Int
   , wr_posttype :: Text
   , wr_attachments_json :: Maybe JSON
-  , wr_copy_history_json :: Maybe JSON
-  } deriving (Show)
+  , wr_copy_history :: [WallRecord]
+  } deriving (Eq, Show, Data, Typeable)
 
 instance FromJSON WallRecord where
   parseJSON = Aeson.withObject "WallRecord" $ \o ->
     WallRecord
       <$> (o .: "id")
       <*> (o .: "from_id")
+      <*> (fromMaybe (-1) <$> (o .:? "owner_id"))
       <*> (o .: "text")
       <*> (o .: "date")
       <*> (o .: "post_type")
       <*> (o .:? "attachments")
-      <*> (o .:? "copy_history")
+      <*> (fromMaybe [] <$> (o .:? "copy_history"))
 
 publishedAt :: WallRecord -> UTCTime
 publishedAt wr = posixSecondsToUTCTime $ fromIntegral $ wr_date wr
@@ -166,7 +145,7 @@ instance Monoid a => Monoid (Sized a) where
   mappend (Sized x a) (Sized y b) = Sized (x+y) (a<>b)
 
 data Deact = Banned | Deleted | OtherDeact Text
-  deriving(Show,Eq,Ord)
+  deriving(Show,Eq,Ord,Data,Typeable)
 
 instance FromJSON Deact where
   parseJSON = Aeson.withText "Deact" $ \x ->
@@ -176,7 +155,7 @@ instance FromJSON Deact where
               x -> OtherDeact x
 
 data GroupType = Group | Event | Public
-  deriving(Show,Eq,Ord)
+  deriving(Show,Eq,Ord,Data,Typeable)
 
 instance FromJSON GroupType where
   parseJSON = Aeson.withText "GroupType" $ \x ->
@@ -186,7 +165,7 @@ instance FromJSON GroupType where
               "event" -> Event
 
 data GroupIsClosed = GroupOpen | GroupClosed | GroupPrivate
-  deriving(Show,Eq,Ord,Enum)
+  deriving(Show,Eq,Ord,Enum,Data,Typeable)
 
 data GroupRecord = GroupRecord {
     gr_id :: Int
@@ -207,7 +186,7 @@ data GroupRecord = GroupRecord {
   -- arbitrary fields
   , gr_can_post :: Maybe Bool
   , gr_members_count :: Maybe Int
-  } deriving (Show)
+  } deriving (Show, Data, Typeable)
 
 instance FromJSON GroupRecord where
   parseJSON = Aeson.withObject "GroupRecord" $ \o ->
@@ -247,7 +226,6 @@ instance FromJSON Country where
     Country
       <$> (o .: "id")
       <*> (o .: "title")
-
 
 data City = City {
     c_city_id :: Integer
