@@ -12,6 +12,7 @@ let
       , mtl, network-uri, optparse-applicative, parsec, pipes, pipes-http
       , pretty-show, regexpr, split, stdenv, taglib, tagsoup, text, time
       , utf8-string, vector, cabal-install, zlib, haskdogs, hasktags, scientific
+      , hdevtools
       }:
       mkDerivation {
         pname = "VKHS";
@@ -26,6 +27,7 @@ let
           http-client-tls http-types mtl network-uri optparse-applicative
           parsec pipes pipes-http pretty-show split taglib tagsoup time
           utf8-string vector cabal-install zlib scientific
+          pkgs.haskellPackages.ghc-mod hdevtools
         ];
         executableHaskellDepends = [ regexpr text haskdogs ];
         executableToolDepends = [ haskdogs hasktags ];
@@ -35,6 +37,9 @@ let
         license = stdenv.lib.licenses.bsd3;
 
         shellHook=''
+          if test -f /etc/myprofile ; then
+            . /etc/myprofile
+          fi
           export LIBRARY_PATH=${pkgs.zlib}/lib:${pkgs.taglib}/lib
         '';
       };

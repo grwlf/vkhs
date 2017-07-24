@@ -57,7 +57,7 @@ main = runVK_ defaultOptions { o_verbose = False} $ do
 
             Just wr -> do
               wr1 <- map wallDesc <$> pure (wr_copy_history wr)
-              wr2 <- map wallDesc <$> rr_items <$> (lift $ getWallReposts wr)
+              wr2 <- map wallDesc . rr_items <$> lift (getWallReposts wr)
 
               frontier2 <- pure $
                 HashSet.toList (HashSet.fromList (wr1 <> wr2) `HashSet.difference` visited)
