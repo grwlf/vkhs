@@ -6,7 +6,8 @@ module Web.VKHS.Error where
 import Web.VKHS.Types
 import Web.VKHS.Client (Response, Request, URL)
 import qualified Web.VKHS.Client as Client
-import Data.ByteString.Char8 (ByteString, unpack)
+-- import Data.ByteString.Char8 (ByteString, unpack)
+import qualified Text.HTML.TagSoup.Parsec as Tagsoup
 
 import Web.VKHS.Imports
 
@@ -46,7 +47,7 @@ data Result t a =
   -- ^ Invalid URL. It is possible for client to set a correct URL and continue
   | UnexpectedRequest Client.Error (Request -> t (R t a) (R t a))
   | UnexpectedResponse Client.Error (Response -> t (R t a) (R t a))
-  | UnexpectedFormField Form String (String -> t (R t a) (R t a))
+  | UnexpectedFormField [Tagsoup.Tag String] Form String (String -> t (R t a) (R t a))
   | LoginActionsExhausted
   | RepeatedForm Form (() -> t (R t a) (R t a))
   | JSONParseFailure ByteString (JSON -> t (R t a) (R t a))

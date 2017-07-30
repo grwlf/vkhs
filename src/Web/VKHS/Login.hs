@@ -109,8 +109,8 @@ printForm prefix Shpider.Form{..} =
     forM_ (Map.toList inputs) $ \(input,value) -> do
       telln $ prefix ++ "\t" ++ input ++ ":" ++ (if null value then "<empty>" else value)
 
-fillForm :: (MonadLogin (m (R m x)) (R m x) s) => Form -> Login m x FilledForm
-fillForm f@(Form{..}) = do
+fillForm :: (MonadLogin (m (R m x)) (R m x) s) => [Tagsoup.Tag String] -> Form -> Login m x FilledForm
+fillForm tags f@(Form{..}) = do
     LoginState{..} <- toLoginState <$> get
     GenericOptions{..} <- gets toGenericOptions
     let empty_inputs = Shpider.emptyInputs form
@@ -131,7 +131,7 @@ fillForm f@(Form{..}) = do
               -- trace "Using default value for " ++ input ++ " (" ++ value ++ ")" $ do
               return (input, value)
             True -> do
-              value' <- raise (\k -> UnexpectedFormField f input k)
+              value' <- raise (\k -> UnexpectedFormField tags f input k)
               return (input, value')
     -- Replace HTTPS with HTTP if not using TLS
     let action' = (if o_use_https == False && isPrefixOf "https" (Shpider.action form) then
@@ -176,11 +176,11 @@ analyzeResponse (res, jar) = do
           terminate LoginActionsExhausted
         (f:[]) -> do
            debug $ printForm "< 0 " $ form f
-           ff <- fillForm f
+           ff <- fillForm tags f
            return $ Left (DoPOST ff jar)
         fs -> do
           forM_ (fs`zip`[0..]) $ \(f,n) -> do
-            ff <- fillForm f
+            ff <- fillForm tags f
             debug $ printForm ("< " ++ (show n) ++ " ") $ fform ff
           terminate LoginActionsExhausted
 

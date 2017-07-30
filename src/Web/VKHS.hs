@@ -27,6 +27,8 @@ import System.IO
 
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Text as Text
+import qualified Network.Shpider.Forms as Shpider
+import qualified System.Process as Process
 
 import Web.VKHS.Imports
 import Web.VKHS.Error
@@ -113,15 +115,29 @@ defaultSupervisor = go where
         alert "UnexpectedInt (ignoring)"
         go (k 0)
 
-      UnexpectedFormField (Form tit f) i k -> do
-        alert $ "While filling form " <> (printForm "" f)
-        case o_allow_interactive of
-          True -> do
-            v <- do
-              alert $ "Please, enter the value for input " <> tpack i <> " : "
-              liftIO $ getLine
+      UnexpectedFormField tags (Form tit f) i k ->
+        let
+          generic_filler = do
+            alert $ "Please, enter the value for input " <> tpack i <> " : "
+            v <- liftIO $ getLine
             go (k v)
-          False -> do
+
+        in do
+        alert $ "While filling form " <> (printForm "" f)
+        case (o_allow_interactive,i ) of
+
+          (True,"captcha_key") -> do
+            case Shpider.gatherCaptcha tags of
+              Just c -> do
+                alert $ "Please fill the captcha " <> tshow c
+                liftIO $ Process.spawnCommand $ "curl '" <> c <> "' | feh -"
+                v <- liftIO $ getLine
+                go (k v)
+              Nothing ->
+                generic_filler
+          (True,_) -> generic_filler
+
+          (False,_) -> do
             alert $ "Unable to query value for " <> tpack i <> " since interactive mode is disabled"
             lift $ throwError res_desc
 

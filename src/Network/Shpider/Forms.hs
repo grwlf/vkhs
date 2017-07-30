@@ -34,6 +34,7 @@ module Network.Shpider.Forms
    , mkForm
    , gatherTitle
    , emptyInputs
+   , gatherCaptcha
    )
    where
 
@@ -100,6 +101,9 @@ gatherForms =
 gatherTitle :: [Tag String] -> String
 gatherTitle ts = case tParse allTitles ts of { [] -> "" ; x:_ -> x }
 
+gatherCaptcha :: [Tag String] -> Maybe String
+gatherCaptcha ts = case tParse allCaptchas ts of { [] -> Nothing ; x:_ -> Just x }
+
 allTitles :: TagParser String [String]
 allTitles = do
    fs <- allWholeTags "title"
@@ -110,6 +114,15 @@ allTitles = do
         _ -> []
         ) innerTags
     ) fs
+
+allCaptchas :: TagParser String [String]
+allCaptchas = do
+  ts <- allWholeTags "img"
+  return $ flip mapMaybe ts $
+    \(TagOpen "img" attrs , _ , _ ) ->
+      case (lookup "id" attrs, lookup "src" attrs) of
+        (Just "captcha", Just url) -> Just url
+        _ -> Nothing
 
 -- | The `TagParser` which parses all forms.
 allForms :: TagParser String [ Form ]
