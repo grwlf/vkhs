@@ -107,6 +107,21 @@ getGroupWall GroupRecord{..} =
           return Nothing
         :: API m x (Maybe (Sized [WallRecord])))
 
+-- | Wrapper for [https://vk.com/dev/wall.get] function
+-- This function demonstrates monadic error handling
+getWall :: forall m x s . (MonadAPI m x s) => Int -> Int -> API m x (Sized [WallRecord])
+getWall owner_id count =
+  apiSimpleHM "wall.get"
+    [("owner_id", tshow owner_id),
+     ("count", tshow count)
+    ]
+    (\ErrorRecord{..} ->
+      case er_code of
+        AccessDenied -> do
+          return (Just $ Sized 0 [])
+        _ -> do
+          return Nothing
+        :: API m x (Maybe (Sized [WallRecord])))
 
 -- | https://vk.com/dev/wall.getById
 getWallById :: (MonadAPI m x s) => (Int, Int) -> API m x (Maybe WallRecord)
@@ -120,14 +135,34 @@ getWallById (owner_id, post_id) = do
         _ -> Nothing
     )
 
--- | https://vk.com/dev/wall.getReposts
-getWallReposts :: (MonadAPI m x s) => WallRecord -> API m x RepostRecord
-getWallReposts WallRecord{..} = do
-  apiSimple "wall.getReposts" $
-    [ ("owner_id",tshow wr_owner_id)
-    , ("post_id",tshow wr_id)
+-- | Return modified and unmodified reposts of this wall recor. Algorithm is
+-- based on the following methods:
+--    https://vk.com/dev/wall.getReposts
+--    https://vk.com/dev/likes.getList
+-- See also https://habrahabr.ru/post/177641 (in Russian) for explanation
+getWallReposts :: (MonadAPI m x s) => WallRecord -> API m x [WallRecord]
+getWallReposts wr = do
+  modified_reposts <- apiSimple "wall.getReposts" $
+    [ ("owner_id",tshow (wr_owner_id wr))
+    , ("post_id",tshow (wr_id wr))
     , ("count",tshow 1000)
     ]
+
+  (Sized cnt owners :: Sized [Int]) <-
+    apiSimple "likes.getList" $
+      [ ("type","post")
+      , ("owner_id",tshow (wr_owner_id wr))
+      , ("item_id",tshow (wr_id wr))
+      , ("filter","copies")
+      , ("count",tshow 1000)
+      ]
+
+  unmodified_reposts <-
+    concat <$> do
+      forM owners $ \o -> do
+        (Sized cnt wrs) <- getWall o 20
+        return [ x | x <- wrs, (wr_id wr) `elem`(map wr_id (wr_copy_history x))]
+  return $ (rr_items modified_reposts) <> unmodified_reposts
 
 -- TODO: Take User as argument for more type-safety
 getAlbums :: (MonadAPI m x s) => Maybe Integer -> API m x (Sized [Album])
