@@ -193,7 +193,7 @@ getCurrentUser = do
 setUserPhoto :: (MonadAPI m x s) => UserRecord -> FilePath -> API m x ()
 setUserPhoto UserRecord{..} photo_path =  do
   OwnerUploadServer{..} <-
-    resp_data <$> api "photos.getOwnerPhotoUploadServer"
+    (fst . resp_data) <$> api "photos.getOwnerPhotoUploadServer"
       [("owner_id", tshow ur_id)]
   req <- ensure $ requestUploadPhoto ous_upload_url photo_path
   (res, _) <- requestExecute req
@@ -207,6 +207,6 @@ setUserPhoto UserRecord{..} photo_path =  do
       [("server", tshow upl_server)
       ,("hash", upl_hash)
       ,("photo", upl_photo)]
-  PhotoSaveResult{..} <- pure resp_data
+  PhotoSaveResult{..} <- pure (fst resp_data)
   return ()
 

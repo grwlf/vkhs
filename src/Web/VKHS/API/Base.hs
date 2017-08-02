@@ -37,12 +37,14 @@ import Debug.Trace
 data Response a = Response {
     resp_json :: JSON
     -- ^ Original JSON representation of the respone, as received from the VK
-  , resp_data :: a
+  , resp_data :: (a,Bool)
     -- ^ Haskell ADT representation of the response
+  -- , resp_error :: Bool
+    -- ^ Indicator showing whether the parsed string contained 'response' or 'error'
   } deriving (Show, Functor, Data, Typeable)
 
 emptyResponse :: (Monoid a) => Response a
-emptyResponse = Response (JSON $ Aeson.object []) mempty
+emptyResponse = Response (JSON $ Aeson.object []) (mempty,True)
 
 parseJSON_obj_error :: String -> Aeson.Value -> Aeson.Parser a
 parseJSON_obj_error name o = fail $
@@ -50,7 +52,10 @@ parseJSON_obj_error name o = fail $
 
 instance (FromJSON a) => FromJSON (Response a) where
   parseJSON j = Aeson.withObject "Response" (\o ->
-    Response <$> pure (JSON j) <*> (o .: "error" <|> o .: "response")) j
+    Response
+      <$> pure (JSON j)
+      <*> (((,) <$> (o .: "error") <*> pure False) <|> ((,) <$> (o .: "response") <*> pure True))
+      ) j
 
 -- | Wrapper for common error codes returned by the VK API
 data ErrorCode =
@@ -205,12 +210,15 @@ apiRf m0 args0 flt = go (ReExec m0 args0) where
         ReParse j -> do
           pure j
     case parseJSON j of
-      (Right (Response _ b)) -> do
-        case flt b of
-          Right a -> do
+      (Right (Response _ (b,ok))) -> do
+        case (ok,flt b) of
+          (True, Right a) -> do
             return a
-          Left e -> do
+          (True, Left e) -> do
             recovery <- raise (CallFailure (m0, args0, j, e))
+            go recovery
+          (False,_) -> do
+            recovery <- raise (CallFailure (m0, args0, j, "Error response"))
             go recovery
       (Left e) -> do
         recovery <- raise (CallFailure (m0, args0, j, e))
@@ -246,14 +254,14 @@ apiHM m0 args0 handler = go (ReExec m0 args0) where
       (Left e1, Left e2) -> do
         recovery <- raise (CallFailure (m0, args0, j, e1 <> ";" <> e2))
         go recovery
-      (Left e, Right (Response _ err)) -> do
+      (Left e, Right (Response _ (err, _))) -> do
         ma <- (handler err)
         case ma of
           Just a -> return a
           Nothing -> do
             recovery <- raise (CallFailure (m0, args0, j, e))
             go recovery
-      (Right _, Right (Response _ err)) -> do
+      (Right _, Right (Response _ (err,_))) -> do
         ma <- (handler err)
         case ma of
           Just a -> return a
@@ -261,7 +269,7 @@ apiHM m0 args0 handler = go (ReExec m0 args0) where
             recovery <- raise (CallFailure (m0, args0, j,
               "Response matches both error and result object"))
             go recovery
-      (Right (Response _ a), _) -> do
+      (Right (Response _ (a,_)), _) -> do
         return a
 
 apiH :: forall m x a s . (Aeson.FromJSON a, MonadAPI m x s)

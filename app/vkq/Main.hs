@@ -13,6 +13,10 @@ import System.IO(stderr)
 import Options.Applicative
 import Text.RegexPR
 
+import Text.Parsec ((<|>),(<?>))
+import qualified Text.Parsec        as Parsec
+import qualified Text.Parsec.String as Parsec
+
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.ByteString.Char8 as BS
@@ -205,13 +209,36 @@ cmd (Login go LoginOptions{..}) = do
       liftIO $ putStrLn $ Text.pack at_access_token
 
 -- API / CALL
-cmd (API go APIOptions{..}) = do
-  x <- apiJ a_method (map (id *** tpack) $ splitFragments "," "=" a_args)
-  if a_pretty
-    then do
-      liftIO $ putStrLn $ jsonEncodePretty x
-    else
-      liftIO $ putStrLn $ jsonEncode x
+cmd (API go APIOptions{..}) =
+  let
+    word :: Parsec.Parser String
+    word = Parsec.try (do
+            c <- Parsec.oneOf "\"'"
+            ret <- Parsec.many $ Parsec.satisfy (/=c)
+            Parsec.char c
+            return ret)
+         Parsec.<|>
+            Parsec.many (Parsec.satisfy (not . flip elem (" \"=," :: String)))
+
+    term :: Parsec.Parser (String,String)
+    term = (,) <$> word <*> ((Parsec.char '=') *> word) <?> "term"
+
+    parser :: Parsec.Parser [(String,String)]
+    parser = do
+      ret <- Parsec.sepBy term (Parsec.char ',')
+      Parsec.eof
+      return ret
+  in do
+  res <- pure $ Parsec.runParser parser () "<cmdline>" a_args
+  case res of
+    Left err -> error $ "error parsing command line arguments: " <> show err
+    Right pairs -> do
+      x <- apiR a_method (map (id *** tpack) pairs)
+      if a_pretty
+        then do
+          liftIO $ putStrLn $ jsonEncodePretty x
+        else
+          liftIO $ putStrLn $ jsonEncode x
 
 cmd (Music go@GenericOptions{..} mo@MusicOptions{..}) = do
   error "VK disabled audio API since 2016/11."

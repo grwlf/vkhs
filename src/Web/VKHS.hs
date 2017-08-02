@@ -155,7 +155,7 @@ defaultSupervisor = go where
             alert $ "Failed to parse JSON error object, message: " <> tshow err
             lift $ throwError res_desc
 
-          Right (Response _ ErrorRecord{..}) -> do
+          Right (Response _ (ErrorRecord{..},_)) -> do
             case er_code of
               NotLoggedIn -> do
                 alert $ "Attempting to re-login"

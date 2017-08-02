@@ -127,7 +127,7 @@ newtype URL = URL { uri :: Client.URI }
 --    * FIXME Pack Text to ByteStrings, not to String
 buildQuery :: [(String,String)] -> URL_Query
 buildQuery qis = URL_Query ("?" ++ intercalate "&" (map (\(a,b) -> (esc a) ++ "=" ++ (esc b)) qis)) where
-  esc x = Client.escapeURIString Client.isAllowedInURI x
+  esc x = Client.escapeURIString (\c -> Client.isAllowedInURI c && (not (Client.isReserved c))) x
 
 urlCreate :: URL_Protocol -> URL_Host -> Maybe URL_Port -> URL_Path -> URL_Query -> Either Error URL
 urlCreate URL_Protocol{..} URL_Host{..} port  URL_Path{..} URL_Query{..} =
