@@ -153,16 +153,13 @@ Performing API calls
 
 The session may look like the following:
 
-    $ vkq api "messages.send" "user_id=111111,message=\"test\""  --pretty
-    bd7da7e9cfb4cc12c0a49093173ca8785c7d6c918f00edb7315bb8526f5f372f1174b643e50e1a47d35da
-
-    $ vkq api "users.get" ""
+    $ vkq api 'users.get' ''
     {"response":[{"first_name":"Сергей","uid":222222,"last_name":"Миронов"}]}
 
-    $ vkq api "messages.send" "user_id=333333,message=Hi theree!"
+    $ vkq api 'messages.send' 'user_id=333333,message="Hi there!!!"'
     {"response":57505}
 
-    $ vkq api "groups.search" "q=Haskell"
+    $ vkq api 'groups.search' 'q=Haskell'
     {
         "response": [
             30,
