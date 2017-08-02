@@ -49,6 +49,7 @@ library
                      network-uri,
                      pipes,
                      pipes-http,
+                     process,
                      time,
                      data-default-class,
                      parsec,
