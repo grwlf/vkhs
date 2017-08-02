@@ -24,15 +24,17 @@ ToDo
 
 * ~~Decrypt 'RepeatedForm' errors~~
 * ~~Support storing access-tokens in a temp file~~
-* Still no support for captchas, one probably should hack `defaultSupervisor`
-  and add them.
-* Re-implement VK monad as a Free monad special case
-* Runhaskell: handle some standard command line arguments
-* Minor issues here and there. Use `git grep FIXME` to find them
+* ~~Still no support for captchas, one probably should hack `defaultSupervisor`
+  and add them.~~
+* Make user-friendly multy-platform captcha display.
+* Fix login automata behaviour regarding captcha failures.
+* Re-implement VK monad as a Free monad special case.
+* Runhaskell: handle some standard command line arguments.
 * ~~File uploading still not functioning.~~
 * Network connection timeout is not handled by the coroutine supervisor.
 * Enhance the way `vkq` accepts arguments, support multy-line messages.
 * Grammatical mistakes. Any corrections will be kindly accepted.
+* Minor issues here and there. Use `git grep FIXME` to find them.
 
 Installing
 ==========
@@ -75,15 +77,8 @@ platform. The `default.nix` file contain Nix expression describing the environme
 #### Usual development
 
     $ ghci -isrc:app/vkq:app/common
+    $ ^D
     $ cabal install
-    $ ^D
-
-#### Returning to the system shell
-
-    $ ^D
-    $ nix-build
-    $ ls ./result
-
 
 Building ctags file
 -------------------
