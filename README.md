@@ -131,7 +131,7 @@ Performing API calls
     $ vkq api --help
     Usage: vkq api [--verbose] [--req-per-sec N] [--interactive] [--appid APPID]
                    [--user USER] [--pass PASS] [-a ACCESS_TOKEN]
-                   [--access-token-file FILE] METHOD PARAMS [--pretty]
+                   [--access-token-file FILE] METHOD [PARAMS] [--pretty]
       Call VK API method
 
     Available options:
@@ -153,10 +153,10 @@ Performing API calls
 
 The session may look like the following:
 
-    $ vkq api 'users.get' ''
+    $ vkq api 'users.get'
     {"response":[{"first_name":"Сергей","uid":222222,"last_name":"Миронов"}]}
 
-    $ vkq api 'messages.send' 'user_id=333333,message="Hi there!!!"'
+    $ vkq api 'messages.send' 'user_id=333333' 'message="Hi there!!!"'
     {"response":57505}
 
     $ vkq api 'groups.search' 'q=Haskell'

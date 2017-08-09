@@ -40,7 +40,7 @@ data DBOptions = DBOptions {
 
 data APIOptions = APIOptions {
     a_method :: String
-  , a_args :: String
+  , a_args :: [String]
   , a_pretty :: Bool
   } deriving(Show)
 
@@ -102,7 +102,7 @@ optdesc m =
 
       api_cmd = (info (API <$> genericOptions <*> (APIOptions
         <$> argument str (metavar "METHOD" <> help "Method name")
-        <*> argument str (metavar "PARAMS" <> help "Method arguments, KEY=VALUE[,KEY2=VALUE2[,,,]]")
+        <*> many (argument str (metavar "PARAMS" <> help "Method arguments, KEY=VALUE[,KEY2=VALUE2[,,,]]"))
         <*> switch (long "pretty" <> help "Pretty print resulting JSON")))
             ( progDesc "Call VK API method" ))
 
@@ -218,18 +218,16 @@ cmd (API go APIOptions{..}) =
             Parsec.char c
             return ret)
          Parsec.<|>
-            Parsec.many (Parsec.satisfy (not . flip elem (" \"=," :: String)))
+            Parsec.many (Parsec.satisfy (not . flip elem (" \"=" :: String)))
 
     term :: Parsec.Parser (String,String)
     term = (,) <$> word <*> ((Parsec.char '=') *> word) <?> "term"
 
-    parser :: Parsec.Parser [(String,String)]
-    parser = do
-      ret <- Parsec.sepBy term (Parsec.char ',')
-      Parsec.eof
-      return ret
+    res :: Either Parsec.ParseError [(String,String)]
+    res = foldr (liftA2 (:)) (pure [])
+        $ flip map a_args
+        $ Parsec.runParser term () "<cmdline>"
   in do
-  res <- pure $ Parsec.runParser parser () "<cmdline>" a_args
   case res of
     Left err -> error $ "error parsing command line arguments: " <> show err
     Right pairs -> do
