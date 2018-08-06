@@ -78,8 +78,14 @@ instance FromJSON RepostRecord where
       <*> (o .: "groups")
       <*> (o .: "profiles")
 
+data UserId = UserId { uid_id :: Integer }
+  deriving(Show, Data, Eq, Typeable)
+
+instance FromJSON UserId where
+  parseJSON j = UserId <$> (Aeson.parseJSON j)
+
 data UserRecord = UserRecord
-  { ur_id :: Integer
+  { ur_uid :: UserId
   , ur_first_name :: Text
   , ur_last_name :: Text
   , ur_deactivated :: Maybe Text
@@ -95,7 +101,7 @@ data UserRecord = UserRecord
 instance FromJSON UserRecord where
   parseJSON = Aeson.withObject "UserRecord" $ \o ->
     UserRecord
-      <$> (o .: "id")
+      <$> (UserId <$> (o .: "id"))
       <*> (o .: "first_name")
       <*> (o .: "last_name")
       <*> (o .:? "deactivated")
@@ -167,8 +173,11 @@ instance FromJSON GroupType where
 data GroupIsClosed = GroupOpen | GroupClosed | GroupPrivate
   deriving(Show,Eq,Ord,Enum,Data,Typeable)
 
+data GroupId = GroupId { gid_id :: Integer }
+  deriving(Show,Eq,Data,Typeable)
+
 data GroupRecord = GroupRecord {
-    gr_id :: Int
+    gr_gid :: GroupId
   , gr_name :: Text
   , gr_screen_name :: Text
   , gr_is_closed :: GroupIsClosed
@@ -191,7 +200,7 @@ data GroupRecord = GroupRecord {
 instance FromJSON GroupRecord where
   parseJSON = Aeson.withObject "GroupRecord" $ \o ->
     GroupRecord
-      <$> (o .: "id")
+      <$> (GroupId <$> (o .: "id"))
       <*> (o .: "name")
       <*> (o .: "screen_name")
       <*> fmap toEnum (o .: "is_closed")
@@ -210,7 +219,7 @@ instance FromJSON GroupRecord where
       <*> (o .:? "members_count")
 
 groupURL :: GroupRecord -> String
-groupURL GroupRecord{..} = "https://vk.com/" ++ urlify gr_type ++ (show gr_id) where
+groupURL GroupRecord{..} = "https://vk.com/" ++ urlify gr_type ++ (show $ gid_id $ gr_gid) where
   urlify Group = "club"
   urlify Event = "event"
   urlify Public = "page"

@@ -96,7 +96,7 @@ getCities Country{..} mq =
 getGroupWall :: forall m x s . (MonadAPI m x s) => GroupRecord -> API m x (Sized [WallRecord])
 getGroupWall GroupRecord{..} =
   apiSimpleHM "wall.get"
-    [("owner_id", "-" <> tshow gr_id),
+    [("owner_id", "-" <> (tshow $ gid_id $ gr_gid)),
      ("count", "100")
     ]
     (\ErrorRecord{..} ->
@@ -194,7 +194,7 @@ setUserPhoto :: (MonadAPI m x s) => UserRecord -> FilePath -> API m x ()
 setUserPhoto UserRecord{..} photo_path =  do
   OwnerUploadServer{..} <-
     (fst . resp_data) <$> api "photos.getOwnerPhotoUploadServer"
-      [("owner_id", tshow ur_id)]
+      [("owner_id", tshow $ uid_id $ ur_uid)]
   req <- ensure $ requestUploadPhoto ous_upload_url photo_path
   (res, _) <- requestExecute req
   j@JSON{..} <- decodeJSON (responseBody res)
@@ -210,3 +210,9 @@ setUserPhoto UserRecord{..} photo_path =  do
   PhotoSaveResult{..} <- pure (fst resp_data)
   return ()
 
+getGroupMembers :: (MonadAPI m x s) => GroupId -> API m x (Sized [UserId])
+getGroupMembers GroupId{..} =
+    apiSimple "groups.getMembers" $
+      [ ("group_id", tshow gid_id)
+      , ("count", tshow 1000)
+      ]

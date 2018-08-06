@@ -44,7 +44,7 @@ pshow = Text.pack . show
 listTags = intercalate " " . map (\t -> '%' : t : []) . map fst
 
 gr_tags = [
-    ('i', show . gr_id)
+    ('i', show . gid_id . gr_gid)
   , ('m', maybe "?" show . gr_members_count)
   , ('n', namefilter . Text.unpack . gr_name)
   , ('s', namefilter . Text.unpack . gr_screen_name)
