@@ -1,5 +1,5 @@
 { nixpkgs ? import <nixpkgs> {},
-  ghc ? "ghc7103",
+  ghc ? "ghc822",
   force_build ? false }:
 
 let
@@ -27,7 +27,7 @@ let
           http-client-tls http-types mtl network-uri optparse-applicative
           parsec pipes pipes-http pretty-show split taglib tagsoup time
           utf8-string vector cabal-install zlib scientific
-          pkgs.haskellPackages.ghc-mod hdevtools
+          hdevtools
         ];
         executableHaskellDepends = [ regexpr text haskdogs ];
         executableToolDepends = [ haskdogs hasktags ];
