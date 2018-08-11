@@ -144,6 +144,7 @@ decodeJSON bs = do
 --    * FIXME We currentyl use Text.unpack to encode text into strings. Use encodeUtf8
 --      FIXME instead.
 --    * FIXME Split into request builder and request executer
+{-
 apiJ :: (MonadAPI m x s)
     => String
     -- ^ API method name
@@ -173,6 +174,16 @@ apiJ mname (map (id *** tunpack) -> margs) = do
   debug $ "< " <> jsonEncodePretty res
 
   return res
+
+-}
+
+-- | API via callbacks
+apiJ :: (MonadAPI m x s)
+    => MethodName
+    -> MethodArgs
+    -> API m x JSON
+apiJ mname margs =
+  raise (ExecuteAPI (mname,margs))
 
 
 -- | Invoke the request, return answer as a Haskell datatype. On error fall out

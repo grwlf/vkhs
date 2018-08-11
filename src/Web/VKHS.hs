@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ViewPatterns #-}
 module Web.VKHS (
     module Web.VKHS
   , module Web.VKHS.Client
@@ -25,6 +26,7 @@ import Control.Monad.Reader
 import Debug.Trace
 import System.IO
 
+import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Text as Text
 import qualified Network.Shpider.Forms as Shpider
@@ -87,6 +89,8 @@ instance MonadVK (VK r) r
 instance MonadLogin (VK r) r VKState
 instance MonadAPI VK r VKState
 
+instance MonadClient (StateT VKState (ExceptT Text IO)) VKState
+
 -- | Run the VK coroutine till next return. Consider using 'runVK' for full
 -- spinup.
 stepVK :: VK r r -> StateT VKState (ExceptT Text IO) r
@@ -108,6 +112,7 @@ defaultSupervisor = go where
     res <- stepVK m
     res_desc <- pure (describeResult res)
     case res of
+
       Fine a -> do
         return a
 
@@ -179,6 +184,44 @@ defaultSupervisor = go where
               <> "\n"
               <> "You may try to obtain more details by setting --verbose flag and/or checking the 'latest.html' file"
         lift $ throwError res_desc
+
+      ExecuteAPI (mname,(map (id *** tunpack) -> margs)) k -> do
+        alert $ "Executing API: " <> tpack mname
+
+        GenericOptions{..} <- gets toGenericOptions
+        APIState{..} <- gets toAPIState
+
+        let protocol = (case o_use_https of
+                          True -> "https"
+                          False -> "http")
+        murl <- pure $ urlCreate
+            (URL_Protocol protocol)
+            (URL_Host o_api_host)
+            (Just (URL_Port (show o_port)))
+            (URL_Path ("/method/" ++ mname))
+            (buildQuery (("access_token", api_access_token):margs))
+
+        case murl of
+          Left err ->
+            fail $ show err
+
+          Right url -> do
+            debug $ "> " <> (tshow url)
+
+            mreq <- requestCreateGet url (cookiesCreate ())
+            case mreq of
+              Left err -> do
+                fail $ show err
+              Right req -> do
+                (res, jar') <- requestExecute req
+                mjson <- pure $ Aeson.decode (fromStrict $ responseBody res)
+                case mjson of
+                  Nothing -> do
+                    fail $ "Failed to decode JSON"
+                  Just json -> do
+                    debug $ "< " <> jsonEncodePretty json
+                    go (k json)
+
 
       _ -> do
         alert $ "Unsupervised error: " <> res_desc

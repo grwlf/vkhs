@@ -57,6 +57,7 @@ data Result t a =
   -- Superwiser may wish to replace the JSON with the correct one
   | LogError Text (() -> t (R t a) (R t a))
   | CallFailure (MethodName, MethodArgs, JSON, String) (CallRecovery -> t (R t a) (R t a))
+  | ExecuteAPI (MethodName, MethodArgs) (JSON -> t (R t a) (R t a))
 
 data ResultDescription a =
     DescFine a
