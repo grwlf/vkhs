@@ -15,8 +15,7 @@
 
 module Web.VKHS.API.Base where
 
-import Data.Time
-
+import qualified Data.Map as Map
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import qualified Data.ByteString.Char8 as BS
@@ -55,15 +54,44 @@ instance (FromJSON a) => FromJSON (Response a) where
       <*> (((,) <$> (o .: "error") <*> pure False) <|> ((,) <$> (o .: "response") <*> pure True))
       ) j
 
+type Cache = Map (MethodName,MethodArgs) (JSON,Time)
+
+cacheQuery :: DiffTime -> MethodName -> MethodArgs -> Time -> Cache -> Maybe JSON
+cacheQuery maxage mname margs time c =
+  case Map.lookup (mname,margs) c of
+    Just (json,birth) ->
+      case time `diffTime` birth > maxage of
+        True -> Nothing {- record is too old -}
+        False -> Just json
+    Nothing -> Nothing
+
+cacheAdd :: MethodName -> MethodArgs -> JSON -> Time -> Cache -> Cache
+cacheAdd mname margs json time = Map.insert (mname,margs) (json,time)
+
+cacheFilter :: DiffTime -> Time -> Cache -> Cache
+cacheFilter maxage now = Map.filter (\(_,t) -> (now`diffTime`t) < maxage)
+
+cacheSave :: FilePath -> Cache -> IO ()
+cacheSave fp c = writeFile fp (show c)
+
+cacheLoad :: FilePath -> IO (Maybe Cache)
+cacheLoad fp =
+  let
+    safeReadFile fn = do
+      liftIO $ Web.VKHS.Imports.catch (Just <$> readFile fn) (\(e :: SomeException) -> return Nothing)
+  in
+  (readMaybe =<<) <$> safeReadFile fp
 
 -- | State of the API engine
 data APIState = APIState {
     api_access_token :: String
+  , api_state_cache :: Cache
   } deriving (Show)
 
 defaultState :: APIState
 defaultState = APIState {
     api_access_token = ""
+  , api_state_cache = Map.empty
   }
 
 class ToGenericOptions s => ToAPIState s where

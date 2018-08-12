@@ -20,6 +20,7 @@ module Web.VKHS.Imports (
   , module Data.Function
   , module Data.Either
   , module Data.Maybe
+  , module Data.Map
   , module Data.Typeable
   , module Data.Data
   , module Data.Scientific
@@ -47,6 +48,7 @@ import Data.ByteString.Lazy (fromStrict,toChunks)
 import Data.Scientific (Scientific, FPFormat(..))
 import Data.Either
 import Data.Maybe
+import Data.Map(Map)
 import Data.Monoid((<>))
 import Data.Function (on)
 import Data.Text (Text)

@@ -19,6 +19,8 @@ import Data.Char
 import Data.Data
 import Data.Typeable
 import Data.Text(Text)
+-- import Data.Time.Clock
+import Data.Time (secondsToDiffTime,NominalDiffTime(..),UTCTime(..),diffUTCTime)
 import Data.ByteString.Char8 (ByteString)
 import Data.Aeson (FromJSON(..), ToJSON(..), (.=), (.:))
 import Control.Monad.State (MonadState(..), gets)
@@ -96,12 +98,11 @@ allAccess =
 newtype AppID = AppID { aid_string :: String }
   deriving(Show, Eq, Ord)
 
-
 -- | JSON wrapper.
 --
 --    * FIXME  Implement full set of helper functions
 data JSON = JSON { js_aeson :: Aeson.Value }
-  deriving(Show, Data, Typeable, Eq)
+  deriving(Show, Read, Data, Typeable, Eq)
 
 -- | Encode JSON to strict Char8 ByteStirng
 jsonEncodeBS :: JSON -> ByteString
@@ -167,6 +168,7 @@ data GenericOptions = GenericOptions {
   , l_access_token_file :: FilePath
   -- ^ Filename to store actual access token, should be used to pass its value
   -- between sessions
+  , l_api_cache_time :: DiffTime
   } deriving(Show)
 
 defaultOptions :: GenericOptions
@@ -184,6 +186,8 @@ defaultOptions = GenericOptions {
   , l_password = ""
   , l_access_token = ""
   , l_access_token_file = ".vkhs-access-token"
+  , l_api_cache_time = realToFrac $ secondsToDiffTime 60
+
   }
 
 class ToGenericOptions s where
@@ -293,4 +297,14 @@ data ClientError =
     ErrorParseURL { euri :: Text, emsg :: String }
   | ErrorSetURL { eurl :: URL, emsg :: String }
   deriving(Show, Eq)
+
+
+data Time = Time { t_utc :: UTCTime }
+  deriving(Show, Read, Eq, Ord)
+
+data DiffTime = DiffTime { dt_utc :: NominalDiffTime }
+  deriving(Show, Eq, Ord)
+
+diffTime :: Time -> Time -> DiffTime
+diffTime a b = DiffTime $ diffUTCTime (t_utc a) (t_utc b)
 
