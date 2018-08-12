@@ -36,10 +36,10 @@ type R t a = Result t a
 data Result t a =
     Fine a
   | APIFailed APIError
-  | LogError Text (() -> t (R t a) (R t a))
   | ExecuteAPI (MethodName, MethodArgs) (JSON -> t (R t a) (R t a))
   | UploadFile (HRef,FilePath) (UploadRecord -> t (R t a) (R t a))
   | APILogin (AccessToken -> t (R t a) (R t a))
+  | APIMessage Verbosity Text (() -> t (R t a) (R t a))
 
 
 type L t a = LoginRoutine t a
@@ -48,5 +48,5 @@ data LoginRoutine t a =
     LoginOK a
   | LoginFailed LoginError
   | LoginAskInput [Tagsoup.Tag String] Form String (String -> t (L t a) (L t a))
-  | LoginMessage Text (() -> t (L t a) (L t a))
+  | LoginMessage Verbosity Text (() -> t (L t a) (L t a))
 

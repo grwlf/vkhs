@@ -39,8 +39,6 @@ data Response a = Response {
     -- ^ Original JSON representation of the respone, as received from the VK
   , resp_data :: (a,Bool)
     -- ^ Haskell ADT representation of the response
-  -- , resp_error :: Bool
-    -- ^ Indicator showing whether the parsed string contained 'response' or 'error'
   } deriving (Show, Functor, Data, Typeable)
 
 emptyResponse :: (Monoid a) => Response a
@@ -72,22 +70,6 @@ class ToGenericOptions s => ToAPIState s where
   toAPIState :: s -> APIState
   modifyAPIState :: (APIState -> APIState) -> (s -> s)
 
--- | Modify VK access token in the internal state and its external mirror
--- if enabled, if any.
---
--- See also 'readInitialAccessToken'
-modifyAccessToken :: (MonadIO m, MonadState s m, ToAPIState s) => AccessToken -> m ()
-modifyAccessToken at@AccessToken{..} = do
-  debug $ "Modifying access token, new value: " <> tshow at
-  modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
-  GenericOptions{..} <- getGenericOptions
-  case l_access_token_file of
-    [] -> return ()
-    fl -> do
-      debug $ "Writing access token to file '" <> tpack l_access_token_file <> "'"
-      liftIO $ writeFile l_access_token_file (show at)
-  return ()
-
 -- | Class of monads able to run VK API calls. @m@ - the monad itself, @x@ -
 -- type of early error, @s@ - type of state (see alse @ToAPIState@)
 class (MonadIO (m (R m x)), MonadClient (m (R m x)) s, ToAPIState s, MonadVK (m (R m x)) (R m x)) =>
@@ -97,10 +79,24 @@ class (MonadIO (m (R m x)), MonadClient (m (R m x)) s, ToAPIState s, MonadVK (m 
 -- | Short alias for the coroutine monad
 type API m x a = m (R m x) a
 
--- | API via callbacks
+-- | Perform API call
 api :: (MonadAPI m x s) => MethodName -> MethodArgs -> API m x JSON
 api mname margs = raise (ExecuteAPI (mname,margs))
 
+-- | Upload File to server
+upload :: (MonadAPI m x s) => HRef -> FilePath -> API m x UploadRecord
+upload href filepath = raise (UploadFile (href,filepath))
+
+-- | Ask superviser to re-login
+login :: (MonadAPI m x s) => API m x AccessToken
+login = raise APILogin
+
+-- | Request the superviser to log @text@
+message :: (MonadAPI m x s) => Verbosity -> Text -> API m x ()
+message verb text = raise (APIMessage verb text)
+
+debug :: (MonadAPI m x s) => Text -> API m x ()
+debug = message Debug
 
 api1 :: forall m x a s . (Aeson.FromJSON a, MonadAPI m x s)
     => MethodName -- ^ API method name
@@ -128,11 +124,3 @@ api2 mname margs = do
     (_, Right (Response _ (b,_))) -> do
       return (Right b)
 
--- | Upload File to server
-upload :: (MonadAPI m x s) => HRef -> FilePath -> API m x UploadRecord
-upload href filepath = raise (UploadFile (href,filepath))
-
-
--- | Login using default credentials
-login :: (MonadAPI m x s) => API m x AccessToken
-login = raise APILogin

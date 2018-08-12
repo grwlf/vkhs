@@ -98,8 +98,8 @@ optdesc m =
         (strOption (value "" <> long "pass" <> metavar "PASS" <> help "User password"))
 
       genericOptions_login = genericOptions_
-        (argument str (metavar "USER" <> help "User name or email"))
-        (argument str (metavar "PASS" <> help "User password"))
+        (argument str (metavar "USER" <> help "User name or email" <> value ""))
+        (argument str (metavar "PASS" <> help "User password" <> value ""))
 
 
       api_cmd = (info (API <$> genericOptions <*> (APIOptions

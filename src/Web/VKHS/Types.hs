@@ -192,16 +192,6 @@ class ToGenericOptions s where
 data Verbosity = Normal | Trace | Debug
   deriving(Enum,Eq,Ord,Show)
 
-debug :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
-debug str = do
-  GenericOptions{..} <- gets toGenericOptions
-  when o_verbose $ do
-    liftIO $ Text.hPutStrLn stderr str
-
-alert :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
-alert str = do
-    liftIO $ Text.hPutStrLn stderr str
-
 
 data MusicOptions = MusicOptions {
     m_list_music :: Bool

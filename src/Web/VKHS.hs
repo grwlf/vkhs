@@ -6,6 +6,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Web.VKHS (
     module Web.VKHS
   , module Web.VKHS.Client
@@ -20,6 +22,7 @@ import qualified Data.Aeson.Encode.Pretty as Aeson
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
 import qualified Network.Shpider.Forms as Shpider
 import qualified System.Process as Process
 
@@ -156,9 +159,24 @@ printVKError = \case
     "API program failed: " <> printAPIError e
 
 
+lldebug :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
+lldebug str = do
+  GenericOptions{..} <- gets toGenericOptions
+  when o_verbose $ do
+    liftIO $ Text.hPutStrLn stderr str
+
+llprompt :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
+llprompt str = do
+    liftIO $ Text.hPutStrLn stderr str
+    liftIO $ Text.hPutStr stderr "> "
+
+llalert :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
+llalert str = do
+    liftIO $ Text.hPutStrLn stderr str
+
 executeAPI :: MethodName -> [(String,String)] -> StateT VKState (ExceptT VKError IO) JSON
 executeAPI mname margs = do
-  alert $ "Executing API: " <> tpack mname
+  llalert $ "Executing API: " <> tpack mname
 
   GenericOptions{..} <- gets toGenericOptions
   APIState{..} <- gets toAPIState
@@ -175,7 +193,7 @@ executeAPI mname margs = do
       (URL_Path ("/method/" ++ mname))
       (buildQuery (("access_token", api_access_token):margs))
 
-  debug $ "> " <> (tshow url)
+  lldebug $ "> " <> (tshow url)
 
   mreq <- requestCreateGet url (cookiesCreate ())
   case mreq of
@@ -188,7 +206,7 @@ executeAPI mname margs = do
         Left err -> do
           throwAPIError (Right $ VKJSONDecodeError err bsjson)
         Right json -> do
-          debug $ "< " <> jsonEncodePretty json
+          lldebug $ "< " <> jsonEncodePretty json
 
           case parseJSON json of
             Left err -> do
@@ -197,13 +215,13 @@ executeAPI mname margs = do
             Right (Response _ (APIErrorRecord{..},_)) -> do
               case er_code of
                 NotLoggedIn -> do
-                  alert $ "Attempting to re-login"
+                  llalert $ "Attempting to re-login"
                   at <- loginSupervisor (loginRoutine >>= return . LoginOK)
                   modifyAccessToken at
                   executeAPI mname margs
 
                 TooManyRequestsPerSec -> do
-                  alert $ "Too many requests per second, consider changing options"
+                  llalert $ "Too many requests per second, consider changing options"
                   executeAPI mname margs
 
                 _ -> do
@@ -243,18 +261,18 @@ loginSupervisor = go where
       LoginAskInput tags form@(Form tit f) i k ->
         let
           generic_filler = do
-            alert $ "Please, enter the value for input \"" <> tpack i <> "\" : "
+            llprompt $ "Please, enter the value for input \"" <> tpack i <> "\""
             v <- liftIO $ getLine
             go (k v)
 
         in do
-        alert $ "While filling form " <> (printForm "" f)
-        case (o_allow_interactive,i ) of
+        lldebug $ "While filling form " <> (printForm "" f)
+        case (o_allow_interactive, i) of
 
           (True,"captcha_key") -> do
             case Shpider.gatherCaptcha tags of
               Just c -> do
-                alert $ "Please fill the captcha " <> tshow c
+                llprompt $ "Please fill the captcha " <> tshow c
                 _ <- liftIO $ Process.spawnCommand $ "curl '" <> c <> "' | feh -"
                 v <- liftIO $ getLine
                 go (k v)
@@ -265,8 +283,9 @@ loginSupervisor = go where
           (False,_) -> do
             throwError (VKFormInputError form (tpack i))
 
-      LoginMessage text k -> do
-        alert text
+      LoginMessage verb text k -> do
+        when ((verb < Debug) || o_verbose) $ do
+          llalert text
         go (k ())
 
       LoginFailed e -> do
@@ -285,6 +304,7 @@ loginSupervisor = go where
 apiSupervisor :: (Show a) => VK (R VK a) (R VK a) -> StateT VKState (ExceptT VKError IO) a
 apiSupervisor = go where
   go m = do
+    GenericOptions{..} <- getGenericOptions
     res <- stepVK m
     case res of
 
@@ -294,8 +314,9 @@ apiSupervisor = go where
       APIFailed e ->
         throwError (VKAPIError e)
 
-      LogError text k -> do
-        alert text
+      APIMessage verb text k -> do
+        when ((verb < Debug) || o_verbose) $ do
+          llalert text
         go (k ())
 
       ExecuteAPI (mname,margs) k -> do
@@ -327,7 +348,7 @@ runAPI go@GenericOptions{..} m = do
 
     readInitialAccessToken >>= \case
       Nothing -> do
-        debug "No initial access token was read"
+        lldebug "No initial access token was read"
         return ()
       Just at -> do
         modifyAccessToken at
@@ -344,4 +365,53 @@ runVK_ go = do
   runVK go >=> \case
     Left e -> fail (tunpack $ printVKError e)
     Right _ -> return ()
+
+-- | Read the access token according with respect to user-defined parameters
+--
+-- See also 'modifyAccessToken'
+-- FIXME: move to Utils
+readInitialAccessToken :: (MonadIO m, MonadState s m, ToGenericOptions s) => m (Maybe AccessToken)
+readInitialAccessToken =
+  let
+    str2at s = Just (AccessToken s "<unknown>" "<unknown>")
+
+    safeReadFile fn = do
+      liftIO $ Web.VKHS.Imports.catch (Just <$> readFile fn) (\(e :: SomeException) -> return Nothing)
+
+  in do
+  GenericOptions{..} <- getGenericOptions
+  case l_access_token of
+   [] -> do
+    lldebug "Initial access token is empty"
+    case l_access_token_file of
+      [] -> do
+        lldebug "No access token file specified"
+        return Nothing
+      fl -> do
+        safeReadFile l_access_token_file >>= \case
+          Just txt -> do
+            case readMaybe txt of
+              Just at -> return (Just at)
+              Nothing -> return (str2at txt)
+          Nothing -> do
+            lldebug $ "Unable to read access token from file '" <> tpack l_access_token_file <> "'"
+            return Nothing
+   _ -> do
+    return (str2at l_access_token)
+
+-- | Modify VK access token in the internal state and its external mirror
+-- if enabled, if any.
+--
+-- See also 'readInitialAccessToken'
+modifyAccessToken :: (MonadIO m, MonadState s m, ToAPIState s) => AccessToken -> m ()
+modifyAccessToken at@AccessToken{..} = do
+  lldebug $ "Modifying access token, new value: " <> tshow at
+  modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
+  GenericOptions{..} <- getGenericOptions
+  case l_access_token_file of
+    [] -> return ()
+    fl -> do
+      lldebug $ "Writing access token to file '" <> tpack l_access_token_file <> "'"
+      liftIO $ writeFile l_access_token_file (show at)
+  return ()
 

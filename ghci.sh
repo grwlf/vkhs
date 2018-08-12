@@ -1,2 +1,2 @@
 #!/bin/sh
-ghci -isrc:app/common:app/vkq
+ghci -isrc:app/common:app/vkq:app/runhaskell

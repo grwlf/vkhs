@@ -79,6 +79,10 @@ printAction prefix (DoPOST FilledForm{..} jar) = printForm prefix fform
 
 type Login m x a = m (LoginRoutine m x) a
 
+
+debug :: (MonadLogin m x s) => Text -> Login m x ()
+debug text = raise (LoginMessage Debug text)
+
 ensureClient :: (MonadLogin m x s) => Login m x (Either ClientError a) -> Login m x a
 ensureClient m = m >>= \case
   Left e -> terminate $ LoginFailed $ LoginClientError e
