@@ -12,9 +12,16 @@ module Web.VKHS (
   , module Web.VKHS.Types
   , module Web.VKHS.Error
   , module Web.VKHS.Monad
-  , module Web.VKHS.Login
   , module Web.VKHS.API
   ) where
+
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Encode.Pretty as Aeson
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.Set as Set
+import qualified Data.Text as Text
+import qualified Network.Shpider.Forms as Shpider
+import qualified System.Process as Process
 
 import Data.Time
 import Control.Applicative
@@ -26,23 +33,18 @@ import Control.Monad.Reader
 import Debug.Trace
 import System.IO
 
-import qualified Data.Aeson as Aeson
-import qualified Data.ByteString.Char8 as BS
-import qualified Data.Text as Text
-import qualified Network.Shpider.Forms as Shpider
-import qualified System.Process as Process
+import qualified Web.VKHS.Client as Client
+import qualified Web.VKHS.Monad as VKHS
+import qualified Web.VKHS.Login as Login
+import qualified Web.VKHS.API as API
 
 import Web.VKHS.Imports
 import Web.VKHS.Error
 import Web.VKHS.Types
-import Web.VKHS.Client hiding (Error, Response, defaultState)
-import qualified Web.VKHS.Client as Client
+import Web.VKHS.Client hiding (Response, defaultState)
 import Web.VKHS.Monad hiding (catch)
-import qualified Web.VKHS.Monad as VKHS
-import Web.VKHS.Login (MonadLogin, LoginState(..), ToLoginState(..), printForm, login)
-import qualified Web.VKHS.Login as Login
+import Web.VKHS.Login (MonadLogin, LoginState(..), ToLoginState(..), printForm, loginRoutine)
 import Web.VKHS.API
-import qualified Web.VKHS.API as API
 
 -- | Main state of the VK monad stack. Consists of lesser states plus a copy of
 -- generic options provided by the caller.
@@ -78,52 +80,170 @@ type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
 -- early exit by the means of continuation monad. VK encodes a coroutine which
 -- has entry points defined by 'Result' datatype.
 --
--- See also 'runVK' and 'defaultSupervisor`.
+-- See also 'runVK' and 'apiSupervisor`.
 --
 --    * FIXME Re-write using modern 'Monad.Free'
-newtype VK r a = VK { unVK :: Guts VK (StateT VKState (ExceptT Text IO)) r a }
+newtype VK r a = VK { unVK :: Guts VK (StateT VKState (ExceptT VKError IO)) r a }
   deriving(MonadIO, Functor, Applicative, Monad, MonadState VKState, MonadReader (r -> VK r r) , MonadCont)
 
 instance MonadClient (VK r) VKState
 instance MonadVK (VK r) r
-instance MonadLogin (VK r) r VKState
+instance MonadLogin VK r VKState
 instance MonadAPI VK r VKState
 
-instance MonadClient (StateT VKState (ExceptT Text IO)) VKState
+instance MonadClient (StateT VKState (ExceptT VKError IO)) VKState
 
 -- | Run the VK coroutine till next return. Consider using 'runVK' for full
 -- spinup.
-stepVK :: VK r r -> StateT VKState (ExceptT Text IO) r
+stepVK :: VK r r -> StateT VKState (ExceptT VKError IO) r
 stepVK m = runContT (runReaderT (unVK (VKHS.catch m)) undefined) return
 
--- | Run VK monad @m@ and handle continuation requests using default
--- algorithm. @defaultSupervisor@ would relogin on invalid access token
--- condition, ask for missing form fields (typically - an email/password)
---
--- See also 'runVK'
---
---    * FIXME Store known answers in external DB (in file?) instead of LoginState
---      FIXME dictionary
---    * FIXME Handle capthas (offer running standalone apps)
-defaultSupervisor :: (Show a) => VK (R VK a) (R VK a) -> StateT VKState (ExceptT Text IO) a
-defaultSupervisor = go where
+printAPIError :: APIError -> Text
+printAPIError = \case
+  APIInvalidJSON mname json t ->
+    "Method \"" <> tpack mname <> "\": invalid json (" <> jsonEncode json <> ")"
+  APIUnhandledError mname erec t ->
+    "Method \"" <> tpack mname <> "\": server responded with error (" <> tshow erec  <> ")"
+  APIUnexpected mname t ->
+    "Method \"" <> tpack mname <> "\": unexpected condition (" <> t  <> ")"
+
+printClientError :: ClientError -> Text
+printClientError = \case
+  ErrorParseURL{..} -> "Invalid HTTP url \"" <> euri <> "\""
+  ErrorSetURL{..} -> "Invalid URL \"" <> tshow eurl <> "\""
+
+printLoginError :: LoginError -> Text
+printLoginError = \case
+  LoginNoAction -> "No obvious login action left"
+  LoginClientError e -> "Failed to login due to client error: " <> printClientError e
+  LoginInvalidInputs Form{..} inputs ->
+    "Invalid values for " <> (tshow $ Set.toList inputs) <> " inputs of form \"" <> tpack form_title <> "\""
+
+data VKJSONError =
+    VKJSONDecodeError Text ByteString
+  | VKJSONParseError Text JSON
+  deriving(Show)
+
+printVKJSONError :: VKJSONError -> Text
+printVKJSONError = \case
+  VKJSONDecodeError err bsjson ->
+    "Failed to decode JSON: " <> err <> ":\n" <> bspack bsjson
+  VKJSONParseError err json ->
+    "Failed to parse JSON: " <> err <> ":\n" <> jsonEncodePretty json
+
+data VKError =
+    VKFormInputError Form Text
+  | VKLoginError LoginError
+  | VKUploadError FilePath (Either ClientError VKJSONError)
+  | VKExecAPIError MethodName (Either ClientError VKJSONError)
+  | VKAPIError APIError
+  deriving(Show)
+
+printVKError :: VKError -> Text
+printVKError = \case
+  -- VKInvalidURLError err url ->
+  --   "Invalid URL: " <> err <> ":\n" <> tshow url
+  -- VKInvalidHRefError err HRef{..} ->
+  --   "Invalid HRef: \"" <> href <> "\":\n" <> printClientError err
+  VKFormInputError Form{..} input ->
+    "No value to fill input \"" <> input <> "\" of form \"" <> tpack form_title <> "\""
+  VKLoginError e -> printLoginError e
+  VKUploadError fpath e ->
+    "Failed to upload file \"" <> tpack fpath <> "\": " <> either printClientError printVKJSONError e
+  VKExecAPIError mname e ->
+    "Failed execute method \"" <> tpack mname <> "\": " <> either printClientError printVKJSONError e
+  VKAPIError e ->
+    "API program failed: " <> printAPIError e
+
+
+executeAPI :: MethodName -> [(String,String)] -> StateT VKState (ExceptT VKError IO) JSON
+executeAPI mname margs = do
+  alert $ "Executing API: " <> tpack mname
+
+  GenericOptions{..} <- gets toGenericOptions
+  APIState{..} <- gets toAPIState
+
+  let throwAPIError x = throwError (VKExecAPIError mname x)
+
+  let protocol = (case o_use_https of
+                    True -> "https"
+                    False -> "http")
+  url <- pure $ urlCreate
+      (URL_Protocol protocol)
+      (URL_Host o_api_host)
+      (Just (URL_Port (show o_port)))
+      (URL_Path ("/method/" ++ mname))
+      (buildQuery (("access_token", api_access_token):margs))
+
+  debug $ "> " <> (tshow url)
+
+  mreq <- requestCreateGet url (cookiesCreate ())
+  case mreq of
+    Left err -> do
+      throwAPIError (Left err)
+    Right req -> do
+      (res, jar') <- requestExecute req
+      bsjson <- pure $ responseBody res
+      case decodeJSON bsjson of
+        Left err -> do
+          throwAPIError (Right $ VKJSONDecodeError err bsjson)
+        Right json -> do
+          debug $ "< " <> jsonEncodePretty json
+
+          case parseJSON json of
+            Left err -> do
+              return json {- not an error -}
+
+            Right (Response _ (APIErrorRecord{..},_)) -> do
+              case er_code of
+                NotLoggedIn -> do
+                  alert $ "Attempting to re-login"
+                  at <- loginSupervisor (loginRoutine >>= return . LoginOK)
+                  modifyAccessToken at
+                  executeAPI mname margs
+
+                TooManyRequestsPerSec -> do
+                  alert $ "Too many requests per second, consider changing options"
+                  executeAPI mname margs
+
+                _ -> do
+                  return json {- Allow application to handle the code -}
+
+
+uploadFile :: (FromJSON b, MonadError VKError m, MonadClient m s) => HRef -> String -> m b
+uploadFile href filepath = do
+  mreq <- requestUploadPhoto href filepath
+  case mreq of
+    Left err ->
+      throwError $ VKUploadError filepath (Left err)
+    Right req -> do
+      (res, _) <- requestExecute req
+      bsjson <- pure $ responseBody res
+      case decodeJSON bsjson of
+        Left err -> do
+          throwError $ VKUploadError filepath (Right $ VKJSONDecodeError err bsjson)
+        Right json -> do
+          case parseJSON json of
+            Left err -> do
+              throwError $ VKUploadError filepath (Right $ VKJSONParseError err json)
+            Right urec -> do
+              return urec
+
+
+loginSupervisor :: (Show a) => VK (L VK a) (L VK a) -> StateT VKState (ExceptT VKError IO) a
+loginSupervisor = go where
   go m = do
     GenericOptions{..} <- toGenericOptions <$> get
     res <- stepVK m
-    res_desc <- pure (describeResult res)
     case res of
 
-      Fine a -> do
+      LoginOK a -> do
         return a
 
-      UnexpectedInt e k -> do
-        alert "UnexpectedInt (ignoring)"
-        go (k 0)
-
-      UnexpectedFormField tags (Form tit f) i k ->
+      LoginAskInput tags form@(Form tit f) i k ->
         let
           generic_filler = do
-            alert $ "Please, enter the value for input " <> tpack i <> " : "
+            alert $ "Please, enter the value for input \"" <> tpack i <> "\" : "
             v <- liftIO $ getLine
             go (k v)
 
@@ -135,7 +255,7 @@ defaultSupervisor = go where
             case Shpider.gatherCaptcha tags of
               Just c -> do
                 alert $ "Please fill the captcha " <> tshow c
-                liftIO $ Process.spawnCommand $ "curl '" <> c <> "' | feh -"
+                _ <- liftIO $ Process.spawnCommand $ "curl '" <> c <> "' | feh -"
                 v <- liftIO $ getLine
                 go (k v)
               Nothing ->
@@ -143,101 +263,64 @@ defaultSupervisor = go where
           (True,_) -> generic_filler
 
           (False,_) -> do
-            alert $ "Unable to query value for " <> tpack i <> " since interactive mode is disabled"
-            lift $ throwError res_desc
+            throwError (VKFormInputError form (tpack i))
+
+      LoginMessage text k -> do
+        alert text
+        go (k ())
+
+      LoginFailed e -> do
+        throwError $ VKLoginError e
+
+
+-- | Run VK monad @m@ and handle continuation requests using default
+-- algorithm. @apiSupervisor@ would relogin on invalid access token
+-- condition, ask for missing form fields (typically - an email/password)
+--
+-- See also 'runVK'
+--
+--    * FIXME Store known answers in external DB (in file?) instead of LoginState
+--      FIXME dictionary
+--    * FIXME Handle capthas (offer running standalone apps)
+apiSupervisor :: (Show a) => VK (R VK a) (R VK a) -> StateT VKState (ExceptT VKError IO) a
+apiSupervisor = go where
+  go m = do
+    res <- stepVK m
+    case res of
+
+      Fine a -> do
+        return a
+
+      APIFailed e ->
+        throwError (VKAPIError e)
 
       LogError text k -> do
         alert text
         go (k ())
 
-      CallFailure (m, args, j, err) k -> do
-        alert $    "Error calling API:\n\n\t" <> tshow m <> " " <> tshow args <> "\n"
-              <> "\nResponse object:\n\n\t" <> tpack (ppShow j) <> "\n"
-              <> "\nParser error was:" <> tshow err <> "\n"
+      ExecuteAPI (mname,margs) k -> do
+        json <- executeAPI mname (map (id *** tunpack) margs)
+        go (k json)
 
-        case parseJSON j of
-          Left err -> do
-            alert $ "Failed to parse JSON error object, message: " <> tshow err
-            lift $ throwError res_desc
+      UploadFile (href,filepath) k -> do
+        urec <- uploadFile href filepath
+        go (k urec)
 
-          Right (Response _ (ErrorRecord{..},_)) -> do
-            case er_code of
-              NotLoggedIn -> do
-                alert $ "Attempting to re-login"
-                at <- defaultSupervisor (login >>= return . Fine)
-                modifyAccessToken at
-                go (k $ ReExec m args)
-              TooManyRequestsPerSec -> do
-                alert $ "Too many requests per second, consider changing options"
-                go (k $ ReExec m args)
-              ErrorCode ec -> do
-                alert $  "Unhandled error code " <> tshow ec <> "\n"
-                      <> "Consider improving 'defaultSupervisor' or applying \n"
-                      <> "custom error filters using `apiH` ,`apiHS` or their \n"
-                      <> "high-level wrappers `apiSimpleH` / `apiSimpleHM`"
-                lift $ throwError res_desc
+      APILogin k -> do
+        at <- loginSupervisor (loginRoutine >>= return . LoginOK)
+        go (k at)
 
-      RepeatedForm Form{..} k -> do
-        alert  $ "Failed to complete login procedure. Last seen form is\n"
-              <> "\n"
-              <> printForm "\t" form
-              <> "\n"
-              <> "You may try to obtain more details by setting --verbose flag and/or checking the 'latest.html' file"
-        lift $ throwError res_desc
-
-      ExecuteAPI (mname,(map (id *** tunpack) -> margs)) k -> do
-        alert $ "Executing API: " <> tpack mname
-
-        GenericOptions{..} <- gets toGenericOptions
-        APIState{..} <- gets toAPIState
-
-        let protocol = (case o_use_https of
-                          True -> "https"
-                          False -> "http")
-        murl <- pure $ urlCreate
-            (URL_Protocol protocol)
-            (URL_Host o_api_host)
-            (Just (URL_Port (show o_port)))
-            (URL_Path ("/method/" ++ mname))
-            (buildQuery (("access_token", api_access_token):margs))
-
-        case murl of
-          Left err ->
-            fail $ show err
-
-          Right url -> do
-            debug $ "> " <> (tshow url)
-
-            mreq <- requestCreateGet url (cookiesCreate ())
-            case mreq of
-              Left err -> do
-                fail $ show err
-              Right req -> do
-                (res, jar') <- requestExecute req
-                mjson <- pure $ Aeson.decode (fromStrict $ responseBody res)
-                case mjson of
-                  Nothing -> do
-                    fail $ "Failed to decode JSON"
-                  Just json -> do
-                    debug $ "< " <> jsonEncodePretty json
-                    go (k json)
-
-
-      _ -> do
-        alert $ "Unsupervised error: " <> res_desc
-        lift $ throwError res_desc
-
--- | Run login procedure using 'defaultSupervisor'. Return 'AccessToken' on
+-- | Run loginRoutine procedure using 'apiSupervisor'. Return 'AccessToken' on
 -- success
-runLogin :: GenericOptions -> ExceptT Text IO AccessToken
+runLogin :: GenericOptions -> ExceptT VKError IO AccessToken
 runLogin go = do
   s <- initialState go
-  evalStateT (defaultSupervisor (login >>= return . Fine)) s
+  evalStateT (loginSupervisor (loginRoutine >>= return . LoginOK)) s
 
--- | Run the VK monad @m@ using generic options @go@ and 'defaultSupervisor'.
--- Perform login procedure if needed. This is an mid-layer runner, consider
+-- | Run the VK monad @m@ using generic options @go@ and 'apiSupervisor'.
+-- Perform loginRoutine procedure if needed. This is an mid-layer runner, consider
 -- using 'runVK' instead.
-runAPI :: Show b => GenericOptions -> VK (R VK b) b -> ExceptT Text IO b
+runAPI :: Show b => GenericOptions -> VK (R VK b) b -> ExceptT VKError IO b
 runAPI go@GenericOptions{..} m = do
   s <- initialState go
   flip evalStateT s $ do
@@ -249,16 +332,16 @@ runAPI go@GenericOptions{..} m = do
       Just at -> do
         modifyAccessToken at
 
-    defaultSupervisor (m >>= return . Fine)
+    apiSupervisor (m >>= return . Fine)
 
--- | Run the VK monad @m@ using generic options @go@ and 'defaultSupervisor'
-runVK :: Show a => GenericOptions -> VK (R VK a) a -> IO (Either Text a)
+-- | Run the VK monad @m@ using generic options @go@ and 'apiSupervisor'
+runVK :: Show a => GenericOptions -> VK (R VK a) a -> IO (Either VKError a)
 runVK go = runExceptT . runAPI go
 
 -- | A version of 'runVK' with unit return.
 runVK_ :: Show a => GenericOptions -> VK (R VK a) a -> IO ()
 runVK_ go = do
   runVK go >=> \case
-    Left e -> fail (tunpack e)
+    Left e -> fail (tunpack $ printVKError e)
     Right _ -> return ()
 

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Text.HTML.TagSoup.Parsec 
    ( module Text.HTML.TagSoup
@@ -202,7 +203,7 @@ maybeP :: Show tok => GenParser tok st a -> GenParser tok st ( Maybe a )
 maybeP p =
    try ( do t <- p
             return $ Just t
-       ) <|> ( do anyToken
+       ) <|> ( do _ <- anyToken
                   return Nothing
              )
 

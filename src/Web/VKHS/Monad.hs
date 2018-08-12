@@ -34,7 +34,7 @@ import qualified Data.Text.IO as Text
 import Web.VKHS.Imports
 import Web.VKHS.Error
 import Web.VKHS.Types
-import Web.VKHS.Client hiding(Error)
+import Web.VKHS.Client
 import qualified Web.VKHS.Client as Client
 
 
@@ -54,33 +54,33 @@ catch m = do
 raise :: (MonadVK m r) => ((a -> m b) -> r) -> m a
 raise z = callCC $ \k -> do
   err <- ask
-  err (z k)
+  _ <- err (z k)
   undefined
 
 terminate :: (MonadVK m r) => r -> m a
 terminate r = do
   err <- ask
-  err r
+  _ <- err r
   undefined
 
 -- | Request the superviser to log @text@
 log_error :: MonadVK (t (R t a)) (Result t a) => Text -> t (R t a) ()
 log_error text = raise (LogError text)
 
-class MonadVK (t r) r => EnsureVK t r c a | c -> a where
-  ensure :: t r c -> t r a
+-- class MonadVK (t r) r => EnsureVK t r c a | c -> a where
+--   ensure :: t r c -> t r a
 
-instance (MonadVK (t (R t x)) (R t x)) => EnsureVK t (R t x) (Either Client.Error Request) Request where
-  ensure m  = m >>= \x ->
-    case x of
-      (Right u) -> return u
-      (Left e) -> raise (\k -> UnexpectedRequest e k)
+-- instance (MonadVK (t (R t x)) (R t x)) => EnsureVK t (R t x) (Either Client.Error Request) Request where
+--   ensure m  = m >>= \x ->
+--     case x of
+--       (Right u) -> return u
+--       (Left e) -> raise (\k -> UnexpectedRequest e k)
 
-instance (MonadVK (t (R t x)) (R t x)) => EnsureVK t (R t x) (Either Client.Error URL) URL where
-  ensure m  = m >>= \x ->
-    case x of
-      (Right u) -> return u
-      (Left e) -> raise (\k -> UnexpectedURL e k)
+-- instance (MonadVK (t (R t x)) (R t x)) => EnsureVK t (R t x) (Either Client.Error URL) URL where
+--   ensure m  = m >>= \x ->
+--     case x of
+--       (Right u) -> return u
+--       (Left e) -> raise (\k -> UnexpectedURL e k)
 
 getGenericOptions :: (MonadState s m, ToGenericOptions s) => m GenericOptions
 getGenericOptions = gets toGenericOptions

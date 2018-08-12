@@ -3,7 +3,6 @@ module Web.VKHS.API (
     module Web.VKHS.API.Base
   , module Web.VKHS.API.Types
   , module Web.VKHS.API.Simple
-  , module Web.VKHS.API
   ) where
 
 import Web.VKHS.API.Base

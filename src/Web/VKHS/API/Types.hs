@@ -158,17 +158,18 @@ instance FromJSON Deact where
     return $ case x of
               "deleted" -> Deleted
               "banned" -> Banned
-              x -> OtherDeact x
+              other -> OtherDeact other
 
 data GroupType = Group | Event | Public
   deriving(Show,Eq,Ord,Data,Typeable)
 
 instance FromJSON GroupType where
   parseJSON = Aeson.withText "GroupType" $ \x ->
-    return $ case x of
-              "group" -> Group
-              "page" -> Public
-              "event" -> Event
+    case x of
+      "group" -> return Group
+      "page" -> return Public
+      "event" -> return Event
+      _ -> fail $ "Invalid GroupType: '" <> tunpack x <> "'"
 
 data GroupIsClosed = GroupOpen | GroupClosed | GroupPrivate
   deriving(Show,Eq,Ord,Enum,Data,Typeable)
@@ -276,26 +277,13 @@ instance FromJSON PhotoUploadServer where
       <*> (o .: "user_id")
 
 data OwnerUploadServer = OwnerUploadServer {
-    ous_upload_url :: Text
+    ous_upload_url :: HRef
   } deriving(Show, Data, Typeable)
 
 instance FromJSON OwnerUploadServer where
   parseJSON = Aeson.withObject "OwnerUploadServer" $ \o ->
     OwnerUploadServer
       <$>  (o .: "upload_url")
-
-data UploadRecord = UploadRecord {
-    upl_server :: Integer
-  , upl_photo :: Text
-  , upl_hash :: Text
-  } deriving(Show, Data, Typeable)
-
-instance FromJSON UploadRecord where
-  parseJSON = Aeson.withObject "UploadRecord" $ \o ->
-    UploadRecord
-      <$>  (o .: "server")
-      <*>  (o .: "photo")
-      <*>  (o .: "hash")
 
 
 

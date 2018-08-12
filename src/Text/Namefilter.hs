@@ -1,4 +1,6 @@
-module Text.Namefilter 
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
+
+module Text.Namefilter
   ( namefilter
   ) where
 

@@ -46,16 +46,37 @@ import Web.VKHS.Client(requestUploadPhoto, requestExecute, responseBody, respons
 import Web.VKHS.API.Base
 import Web.VKHS.API.Types
 
+max_count :: Integer
 max_count = 1000
 
 -- | We are using API v5.44 by default
+ver :: Text
 ver = "5.44"
 
 -- | Versioned aliases for api caller functions
-apiSimpleF nm args f = apiRf nm (("v",ver):args) f
-apiSimple nm args = apiR nm (("v",ver):args)
-apiSimpleH nm args handler = apiH nm (("v",ver):args) handler
-apiSimpleHM nm args handler = apiHM nm (("v",ver):args) handler
+-- apiSimpleF nm args f = apiRf nm (("v",ver):args) f
+apiSimple1 :: (MonadAPI m x s, FromJSON a) => MethodName -> [(String, Text)] -> API m x a
+apiSimple1 nm args = api1 nm (("v",ver):args)
+
+apiSimple2 :: (MonadAPI m x s, FromJSON b, FromJSON a) => MethodName -> [(String, Text)] -> API m x (Either a b)
+apiSimple2 nm args = api2 nm (("v",ver):args)
+-- apiSimpleHM nm args handler = apiHM nm (("v",ver):args) handler
+
+apiSimple :: (FromJSON a, MonadAPI m x s) => MethodName -> [(String, Text)] -> API m x a
+apiSimple nm args = apiSimple1 nm args
+-- apiSimpleE nm args handler = do
+
+apiSimpleH :: (FromJSON t, MonadAPI m x s) => MethodName -> [(String, Text)] -> (t -> b) -> (APIErrorRecord -> Either Text b) -> m (R m x) b
+apiSimpleH nm args handlerA handlerB = do
+  res <- apiSimple2 nm args
+  case res of
+    Left e ->
+      case handlerB e of
+        Left text -> terminate $ APIFailed $ APIUnhandledError nm e text
+        Right a -> return a
+    Right a -> return (handlerA a)
+
+
 
 -- | Wrapper for 'groups.search' handler. The function demonstrates
 -- pure-functional error handling.
@@ -66,10 +87,11 @@ groupSearch q =
     [("q",q),
      ("fields", "can_post,members_count"),
      ("count", tpack (show max_count))]
-    (\ErrorRecord{..} ->
+    id
+    (\APIErrorRecord{..} ->
       case er_code of
-        AccessDenied -> (Just $ Sized 0 [])
-        _ -> Nothing
+        AccessDenied -> Right (Sized 0 [])
+        _ -> Left ""
     )
 
 -- | Get list of countries, known to VK
@@ -95,44 +117,42 @@ getCities Country{..} mq =
 -- This function demonstrates monadic error handling
 getGroupWall :: forall m x s . (MonadAPI m x s) => GroupRecord -> API m x (Sized [WallRecord])
 getGroupWall GroupRecord{..} =
-  apiSimpleHM "wall.get"
+  apiSimpleH "wall.get"
     [("owner_id", "-" <> (tshow $ gid_id $ gr_gid)),
      ("count", "100")
     ]
-    (\ErrorRecord{..} ->
+    id
+    (\APIErrorRecord{..} ->
       case er_code of
-        AccessDenied -> do
-          return (Just $ Sized 0 [])
-        _ -> do
-          return Nothing
-        :: API m x (Maybe (Sized [WallRecord])))
+        AccessDenied -> (Right $ Sized 0 [])
+        _ -> Left ""
+    )
 
 -- | Wrapper for [https://vk.com/dev/wall.get] function
--- This function demonstrates monadic error handling
 getWall :: forall m x s . (MonadAPI m x s) => Int -> Int -> API m x (Sized [WallRecord])
 getWall owner_id count =
-  apiSimpleHM "wall.get"
+  apiSimpleH "wall.get"
     [("owner_id", tshow owner_id),
      ("count", tshow count)
     ]
-    (\ErrorRecord{..} ->
+    id
+    (\APIErrorRecord{..} ->
       case er_code of
-        AccessDenied -> do
-          return (Just $ Sized 0 [])
-        _ -> do
-          return Nothing
-        :: API m x (Maybe (Sized [WallRecord])))
+        AccessDenied -> Right $ Sized 0 []
+        _ -> Left ""
+    )
 
 -- | https://vk.com/dev/wall.getById
 getWallById :: (MonadAPI m x s) => (Int, Int) -> API m x (Maybe WallRecord)
 getWallById (owner_id, post_id) = do
-  listToMaybe <$> do
   apiSimpleH "wall.getById"
     [("posts", tshow owner_id <> "_" <> tshow post_id)
     ]
-    (\ErrorRecord{..} ->
+    Just
+    (\APIErrorRecord{..} ->
       case er_code of
-        _ -> Nothing
+        AccessDenied -> Right Nothing
+        _ -> Left ""
     )
 
 -- | Return modified and unmodified reposts of this wall recor. Algorithm is
@@ -145,7 +165,7 @@ getWallReposts wr = do
   modified_reposts <- apiSimple "wall.getReposts" $
     [ ("owner_id",tshow (wr_owner_id wr))
     , ("post_id",tshow (wr_id wr))
-    , ("count",tshow 1000)
+    , ("count",tshow max_count)
     ]
 
   (Sized cnt owners :: Sized [Int]) <-
@@ -154,26 +174,31 @@ getWallReposts wr = do
       , ("owner_id",tshow (wr_owner_id wr))
       , ("item_id",tshow (wr_id wr))
       , ("filter","copies")
-      , ("count",tshow 1000)
+      , ("count",tshow max_count)
       ]
 
   unmodified_reposts <-
     concat <$> do
       forM owners $ \o -> do
-        (Sized cnt wrs) <- getWall o 20
+        (Sized _ wrs) <- getWall o 20
         return [ x | x <- wrs, (wr_id wr) `elem`(map wr_id (wr_copy_history x))]
   return $ (rr_items modified_reposts) <> unmodified_reposts
 
 -- TODO: Take User as argument for more type-safety
 getAlbums :: (MonadAPI m x s) => Maybe Integer -> API m x (Sized [Album])
 getAlbums muid =
-  apiSimple "photos.getAlbums" $
-    (case muid of
-     Just uid -> [("owner_id", tshow uid)]
-     Nothing -> [])
-    <>
-    [("need_system", "1")
-    ]
+  apiSimpleH "photos.getAlbums"
+    ((case muid of
+      Just uid -> [("owner_id", tshow uid)]
+      Nothing -> [])
+     <>
+     [("need_system", "1")])
+    id
+    (\APIErrorRecord{..} ->
+      case er_code of
+        AccessDenied -> Right (Sized 0 [])
+        _ -> Left ""
+    )
 
 getPhotoUploadServer :: (MonadAPI m x s) => Album -> API m x PhotoUploadServer
 getPhotoUploadServer Album{..} =
@@ -183,27 +208,21 @@ getPhotoUploadServer Album{..} =
 -- | Get current user
 getCurrentUser :: (MonadAPI m x s) => API m x UserRecord
 getCurrentUser = do
-  apiSimpleF "users.get" [] $ \users ->
-    case (length users == 1) of
-      False -> Left "getCurrentUser: should be and array containing a single ser record"
-      True -> Right (head users)
-
+  users <- apiSimple "users.get" []
+  case (length users == 1) of
+    False -> terminate $ APIFailed $ APIUnexpected "users.get" "should be and array containing a single user record"
+    True -> return $ head users
 
 --    * FIXME move low-level upload code to API.Base
 setUserPhoto :: (MonadAPI m x s) => UserRecord -> FilePath -> API m x ()
 setUserPhoto UserRecord{..} photo_path =  do
   OwnerUploadServer{..} <-
-    (fst . resp_data) <$> api "photos.getOwnerPhotoUploadServer"
+    (fst . resp_data) <$> apiSimple "photos.getOwnerPhotoUploadServer"
       [("owner_id", tshow $ uid_id $ ur_uid)]
-  req <- ensure $ requestUploadPhoto ous_upload_url photo_path
-  (res, _) <- requestExecute req
-  j@JSON{..} <- decodeJSON (responseBody res)
-  liftIO $ BS.putStrLn $ (responseBody res)
-  UploadRecord{..} <-
-    case Aeson.parseEither Aeson.parseJSON js_aeson of
-      Right a -> return a
-      Left e -> terminate (JSONParseFailure' j e)
-  Response{..} <- api "photos.saveOwnerPhoto"
+
+  UploadRecord{..} <- upload ous_upload_url photo_path
+
+  Response{..} <- apiSimple "photos.saveOwnerPhoto"
       [("server", tshow upl_server)
       ,("hash", upl_hash)
       ,("photo", upl_photo)]
@@ -214,5 +233,5 @@ getGroupMembers :: (MonadAPI m x s) => GroupId -> API m x (Sized [UserId])
 getGroupMembers GroupId{..} =
     apiSimple "groups.getMembers" $
       [ ("group_id", tshow gid_id)
-      , ("count", tshow 1000)
+      , ("count", tshow max_count)
       ]

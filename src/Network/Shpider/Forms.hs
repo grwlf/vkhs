@@ -44,7 +44,7 @@ import Data.Maybe
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 
-import Data.String.UTF8 as U (UTF8(..))
+import Data.String.UTF8 as U (UTF8)
 import qualified Data.String.UTF8 as U
 
 import qualified Data.Map as M
@@ -53,19 +53,20 @@ import Text.HTML.TagSoup.Parsec
 
 import Network.Shpider.TextUtils
 import Network.Shpider.Pairs
+import Text.StringLike (StringLike(..))
 
 -- | Either GET or POST.
 data Method =
    GET | POST
-   deriving Show
+   deriving (Show,Eq)
 
 -- | Plain old form: Method, action and inputs.
-data Form = 
+data Form =
    Form { method :: Method
-        , action :: String 
+        , action :: String
         , inputs :: M.Map String String
         }
-   deriving Show
+   deriving (Show,Eq)
 
 emptyInputs :: Form -> [String]
 emptyInputs = fst . unzip . filter ( not . null . snd )  . M.toList . inputs
@@ -110,7 +111,7 @@ allTitles = do
    return $ mapMaybe (
     \(TagOpen "title" _ , innerTags , _ ) ->
       return $ concat $ map (\t -> case t of
-        TagText t -> t
+        TagText t2 -> t2
         _ -> []
         ) innerTags
     ) fs
@@ -141,6 +142,9 @@ toForm ( TagOpen _ attrs , innerTags , _ ) = do
                , method = m
                }
 
+toForm _ = Nothing
+
+methodLookup :: [(String, String)] -> Maybe Method
 methodLookup attrs = do
    m <- attrLookup "method" attrs
    case lowercase m of
@@ -148,9 +152,10 @@ methodLookup attrs = do
          Just GET
       "post" ->
          Just POST
-      otherwise ->
+      _ ->
          Nothing
 
+inputNameValue :: Tag String -> Maybe (String, [Char])
 inputNameValue ( TagOpen _ attrs ) = do
    v <- case attrLookup "value" attrs of
            Nothing ->
@@ -160,8 +165,12 @@ inputNameValue ( TagOpen _ attrs ) = do
    n <- attrLookup "name" attrs
    Just ( n , v )
 
+inputNameValue _ = Nothing
+
+textAreaNameValue :: StringLike b => (Tag String, [Tag b], c) -> Maybe (String, b)
 textAreaNameValue ( TagOpen _ attrs , inner , _ ) = do
    let v = innerText inner
    n <- attrLookup "name" attrs
    Just ( n , v )
+textAreaNameValue _ = Nothing
 

@@ -16,6 +16,7 @@ module Web.VKHS.Imports (
   , module Data.Text
   , module Data.Text.IO
   , module Data.List
+  , module Data.Set
   , module Data.Function
   , module Data.Either
   , module Data.Maybe
@@ -26,6 +27,9 @@ module Web.VKHS.Imports (
   , module Text.Show.Pretty
   , module Text.Read
   ) where
+
+import qualified Data.ByteString.Char8 as ByteString
+import qualified Data.Text as Text
 
 import Control.Arrow ((***),(&&&))
 import Control.Category ((>>>))
@@ -45,18 +49,23 @@ import Data.Either
 import Data.Maybe
 import Data.Monoid((<>))
 import Data.Function (on)
-import Data.Text (Text(..), pack, unpack)
+import Data.Text (Text)
 import Data.Text.IO (putStrLn, hPutStrLn)
 import Data.List (head, length, sortBy, (++))
+import Data.Set (Set)
 import Text.Printf
 import Text.Show.Pretty
 import Text.Read (readMaybe)
 import System.IO (Handle)
 
+bspack :: ByteString -> Text
+bspack = tpack . ByteString.unpack
+
 tpack :: String -> Text
-tpack = pack
+tpack = Text.pack
+
 tunpack :: Text -> String
-tunpack = unpack
+tunpack = Text.unpack
 
 tshow :: (Show a) => a -> Text
 tshow = tpack . show

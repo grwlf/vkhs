@@ -67,6 +67,7 @@ library
                      directory,
                      pretty-show,
                      scientific
+  ghc-options: -Wall -Wno-unused-imports -Wno-unused-matches
 
 executable vkq
   hs-source-dirs:    app/vkq, app/common, src

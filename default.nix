@@ -41,6 +41,7 @@ let
             . /etc/myprofile
           fi
           export LIBRARY_PATH=${pkgs.zlib}/lib:${pkgs.taglib}/lib
+          cabal() {( `which cabal` --ghc-options=-freverse-errors "$@" ; )}
         '';
       };
 

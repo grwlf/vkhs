@@ -44,7 +44,7 @@ import qualified Network.URI as Client
 import qualified Network.Shpider.Forms as Shpider
 
 import Pipes.Prelude as PP (foldM)
-import qualified Pipes as Pipes (Producer(..), for, runEffect, (>->))
+import qualified Pipes as Pipes (Producer, for, runEffect, (>->))
 import qualified Pipes.HTTP as Pipes hiding (Request, Response)
 
 import qualified Text.Parsec as Parsec
@@ -52,10 +52,6 @@ import qualified Text.Parsec as Parsec
 import Debug.Trace
 
 import Web.VKHS.Types
-
-data Error = ErrorParseURL { euri :: String, emsg :: String }
-           | ErrorSetURL { eurl :: URL, emsg :: String }
-  deriving(Show, Eq)
 
 {-
  __  __                       _
@@ -80,7 +76,7 @@ defaultState GenericOptions{..} = do
                   True -> tlsManagerSettings
                   False -> Client.defaultManagerSettings))
   cl_last_execute <- pure (TimeSpec 0 0)
-  cl_minimum_interval_ns <- pure (round (10^9  / o_max_request_rate_per_sec))
+  cl_minimum_interval_ns <- pure (round ((((10::Rational)^(9::Integer)))  / o_max_request_rate_per_sec))
   cl_verbose <- pure o_verbose
   return ClientState{..}
 
@@ -120,23 +116,19 @@ newtype URL_Port = URL_Port { urlp :: String }
 newtype URL_Path = URL_Path { urlpath :: String }
   deriving(Show)
 
--- | URL wrapper
-newtype URL = URL { uri :: Client.URI }
-  deriving(Show, Eq)
-
 --    * FIXME Pack Text to ByteStrings, not to String
 buildQuery :: [(String,String)] -> URL_Query
 buildQuery qis = URL_Query ("?" ++ intercalate "&" (map (\(a,b) -> (esc a) ++ "=" ++ (esc b)) qis)) where
   esc x = Client.escapeURIString (\c -> Client.isAllowedInURI c && (not (Client.isReserved c))) x
 
-urlCreate :: URL_Protocol -> URL_Host -> Maybe URL_Port -> URL_Path -> URL_Query -> Either Error URL
+urlCreate :: URL_Protocol -> URL_Host -> Maybe URL_Port -> URL_Path -> URL_Query -> URL
 urlCreate URL_Protocol{..} URL_Host{..} port  URL_Path{..} URL_Query{..} =
-  pure $ URL $ Client.URI (urlproto ++ ":") (Just (Client.URIAuth "" urlh (maybe "" ((":"++).urlp) port))) urlpath urlq []
+  URL $ Client.URI (urlproto ++ ":") (Just (Client.URIAuth "" urlh (maybe "" ((":"++).urlp) port))) urlpath urlq []
 
-urlFromString :: String -> Either Error URL
+urlFromString :: String -> Either ClientError URL
 urlFromString s =
   case Client.parseURI s of
-    Nothing -> Left (ErrorParseURL s "Client.parseURI failed")
+    Nothing -> Left (ErrorParseURL (Text.pack s) "Client.parseURI failed")
     Just u -> Right (URL u)
 
 -- |    * FIXME Convert to ByteString /  Text
@@ -152,7 +144,7 @@ splitFragments sep eqs =
         f (x:xs) = (trim x, trim $ intercalate eqs xs)
 
         trim = rev (dropWhile (`elem` (" \t\n\r" :: String)))
-          where rev f = reverse . f . reverse . f
+          where rev g = reverse . g . reverse . g
 
 -- |    * FIXME Convert to ByteString / Text
 urlFragments :: URL -> [(String,String)]
@@ -188,7 +180,7 @@ data Request = Request {
   }
 
 -- | Create HTTP(S) GET request
-requestCreateGet :: (MonadClient m s) => URL -> Cookies -> m (Either Error Request)
+requestCreateGet :: (MonadClient m s) => URL -> Cookies -> m (Either ClientError Request)
 requestCreateGet URL{..} Cookies{..} = do
   case setUri Client.defaultRequest uri of
     Left exc -> do
@@ -205,10 +197,10 @@ requestCreateGet URL{..} Cookies{..} = do
       }
 
 -- | Create HTTP(S) POST request
-requestCreatePost :: (MonadClient m s) => FilledForm -> Cookies -> m (Either Error Request)
+requestCreatePost :: (MonadClient m s) => FilledForm -> Cookies -> m (Either ClientError Request)
 requestCreatePost (FilledForm tit Shpider.Form{..}) c = do
   case Client.parseURI (Client.escapeURIString Client.isAllowedInURI action) of
-    Nothing -> return (Left (ErrorParseURL action "parseURI failed"))
+    Nothing -> return (Left (ErrorParseURL (Text.pack action) "parseURI failed"))
     Just action_uri -> do
       r <- requestCreateGet (URL action_uri) c
       case r of
@@ -222,10 +214,10 @@ requestCreatePost (FilledForm tit Shpider.Form{..}) c = do
 --     * FIXME Use 'URL' rather than Text. Think about
 --       https://github.com/blamario/network-uri
 --
-requestUploadPhoto :: (MonadClient m s) => Text -> String -> m (Either Error Request)
-requestUploadPhoto text_url bs = do
-  case Client.parseURI (Text.unpack text_url) of
-    Nothing -> return (Left (ErrorParseURL (Text.unpack text_url) "parseURI failed"))
+requestUploadPhoto :: (MonadClient m s) => HRef -> String -> m (Either ClientError Request)
+requestUploadPhoto HRef{..} bs = do
+  case Client.parseURI (Text.unpack href) of
+    Nothing -> return (Left (ErrorParseURL href "parseURI failed"))
     Just uri -> do
       r <- requestCreateGet (URL uri) (cookiesCreate ())
       case r of
@@ -293,7 +285,7 @@ requestExecute Request{..} = do
     Pipes.withHTTP req cl_man $ \resp -> do
       resp_body <- PP.foldM (\a b -> return $ BS.append a b) (return BS.empty) return (Client.responseBody resp)
       now <- getCurrentTime
-      let (jar', resp') = Client.updateCookieJar resp req now jar
+      let (jar', _) = Client.updateCookieJar resp req now jar
       return (Response resp resp_body, Cookies jar')
 
 -- | Download helper

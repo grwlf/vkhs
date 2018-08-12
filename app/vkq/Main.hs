@@ -7,6 +7,7 @@ module Main where
 
 import Prelude hiding(putStrLn)
 import Control.Monad.Except
+import Control.Exception(SomeException(..))
 import System.Environment
 import System.Exit
 import System.IO(stderr)
@@ -21,12 +22,13 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.ByteString.Char8 as BS
 
+-- import Web.VKHS.Types
+-- import Web.VKHS.Error
+-- import Web.VKHS.Client as Client
+-- import Web.VKHS.Monad hiding (catch)
+-- import Web.VKHS.API as API
 import Web.VKHS.Imports
 import Web.VKHS
-import Web.VKHS.Types
-import Web.VKHS.Client as Client
-import Web.VKHS.Monad hiding (catch)
-import Web.VKHS.API as API
 
 import Util
 
@@ -179,7 +181,7 @@ main = ( do
   r <- runVK (genOpts o) (cmd o)
   case r of
     Left err -> do
-      hPutStrLn stderr err
+      hPutStrLn stderr (printVKError err)
       exitFailure
     Right _ -> do
       return ()
@@ -197,7 +199,7 @@ main = ( do
 
  -}
 
-cmd :: (MonadLogin (m (R m x)) (R m x) s, MonadAPI m x s) => Options -> m (R m x) ()
+cmd :: (MonadAPI m x s) => Options -> m (R m x) ()
 
 -- Login
 cmd (Login go LoginOptions{..}) = do
@@ -231,7 +233,7 @@ cmd (API go APIOptions{..}) =
   case res of
     Left err -> error $ "error parsing command line arguments: " <> show err
     Right pairs -> do
-      x <- apiR a_method (map (id *** tpack) pairs)
+      x <- api a_method (map (id *** tpack) pairs)
       if a_pretty
         then do
           liftIO $ putStrLn $ jsonEncodePretty x
