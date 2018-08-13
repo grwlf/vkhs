@@ -79,7 +79,7 @@ instance FromJSON RepostRecord where
       <*> (o .: "profiles")
 
 data UserId = UserId { uid_id :: Integer }
-  deriving(Show, Data, Eq, Typeable)
+  deriving(Show, Data, Eq, Ord, Typeable)
 
 instance FromJSON UserId where
   parseJSON j = UserId <$> (Aeson.parseJSON j)
@@ -90,6 +90,8 @@ data UserRecord = UserRecord
   , ur_last_name :: Text
   , ur_deactivated :: Maybe Text
   , ur_hidden :: Maybe Integer
+  , ur_city :: Maybe City
+  , ur_country :: Maybe Country
   -- , ur_photo :: String
   -- , ur_university :: Maybe Int
   -- , ur_university_name :: Maybe String
@@ -106,6 +108,8 @@ instance FromJSON UserRecord where
       <*> (o .: "last_name")
       <*> (o .:? "deactivated")
       <*> (o .:? "hidden")
+      <*> (o .:? "city")
+      <*> (o .:? "country")
 
 -- | Wall post representation (partial)
 --
@@ -175,7 +179,7 @@ data GroupIsClosed = GroupOpen | GroupClosed | GroupPrivate
   deriving(Show,Eq,Ord,Enum,Data,Typeable)
 
 data GroupId = GroupId { gid_id :: Integer }
-  deriving(Show,Eq,Data,Typeable)
+  deriving(Show,Eq,Ord,Data,Typeable)
 
 data GroupRecord = GroupRecord {
     gr_gid :: GroupId
@@ -229,7 +233,7 @@ groupURL GroupRecord{..} = "https://vk.com/" ++ urlify gr_type ++ (show $ gid_id
 data Country = Country {
     co_int :: Integer
   , co_title :: Text
-} deriving(Show)
+} deriving(Show,Data,Typeable)
 
 instance FromJSON Country where
   parseJSON = Aeson.withObject "Country" $ \o ->
@@ -242,7 +246,7 @@ data City = City {
   , c_title :: Text
   , c_maybe_area :: Maybe Text
   , c_maybe_region :: Maybe Text
-} deriving(Show)
+} deriving(Show,Data,Typeable)
 
 instance FromJSON City where
   parseJSON = Aeson.withObject "City" $ \o ->

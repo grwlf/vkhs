@@ -168,7 +168,7 @@ data GenericOptions = GenericOptions {
   , l_access_token_file :: FilePath
   -- ^ Filename to store actual access token, should be used to pass its value
   -- between sessions
-  , l_api_cache_time :: DiffTime
+  -- , l_api_cache_time :: DiffTime
   } deriving(Show)
 
 defaultOptions :: GenericOptions
@@ -186,8 +186,7 @@ defaultOptions = GenericOptions {
   , l_password = ""
   , l_access_token = ""
   , l_access_token_file = ".vkhs-access-token"
-  , l_api_cache_time = realToFrac $ secondsToDiffTime 60
-
+  -- , l_api_cache_time = realToFrac $ secondsToDiffTime 60
   }
 
 class ToGenericOptions s where

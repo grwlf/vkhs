@@ -80,19 +80,20 @@ apiSimpleH nm args handlerA handlerB = do
 
 -- | Wrapper for 'groups.search' handler. The function demonstrates
 -- pure-functional error handling.
-groupSearch :: (MonadAPI m x s) => Text -> API m x (Sized [GroupRecord])
+groupSearch :: (MonadAPI m x s) => Text -> API m x [GroupRecord]
 groupSearch q =
-  fmap (sortBy (compare `on` gr_members_count)) <$> do
-  apiSimpleH "groups.search"
-    [("q",q),
-     ("fields", "can_post,members_count"),
-     ("count", tpack (show max_count))]
-    id
-    (\APIErrorRecord{..} ->
-      case er_code of
-        AccessDenied -> Right (Sized 0 [])
-        _ -> Left ""
-    )
+  sortBy (compare `on` gr_members_count) <$> do
+    m_items <$> do
+      apiSimpleH "groups.search"
+        [("q",q),
+         ("fields", "can_post,members_count"),
+         ("count", tpack (show max_count))]
+        id
+        (\APIErrorRecord{..} ->
+          case er_code of
+            AccessDenied -> Right (Sized 0 [])
+            _ -> Left ""
+        )
 
 -- | Get list of countries, known to VK
 getCountries :: (MonadAPI m x s) => API m x (Sized [Country])
@@ -205,6 +206,13 @@ getPhotoUploadServer Album{..} =
   apiSimple "photos.getUploadServer" [("album_id", tshow al_id)]
 
 
+getUsers :: (MonadAPI m x s) => [UserId] -> API m x [UserRecord]
+getUsers uids = do
+  apiSimple "users.get" [
+      ("user_ids", Text.intercalate "," [tshow x | UserId x <- uids])
+    , ("fields", "city,country")
+    ]
+
 -- | Get current user
 getCurrentUser :: (MonadAPI m x s) => API m x UserRecord
 getCurrentUser = do
@@ -229,9 +237,10 @@ setUserPhoto UserRecord{..} photo_path =  do
   PhotoSaveResult{..} <- pure (fst resp_data)
   return ()
 
-getGroupMembers :: (MonadAPI m x s) => GroupId -> API m x (Sized [UserId])
+getGroupMembers :: (MonadAPI m x s) => GroupId -> API m x [UserId]
 getGroupMembers GroupId{..} =
-    apiSimple "groups.getMembers" $
+  m_items <$>
+    (apiSimple "groups.getMembers"
       [ ("group_id", tshow gid_id)
       , ("count", tshow max_count)
-      ]
+      ])
