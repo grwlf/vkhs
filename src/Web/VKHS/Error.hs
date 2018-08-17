@@ -10,22 +10,8 @@ import qualified Text.HTML.TagSoup.Parsec as Tagsoup
 import Web.VKHS.Types
 import Web.VKHS.Imports
 
--- data Error = ETimeout | EClient Client.Error
---   deriving(Show, Eq)
-
--- | Message type used by the Superwiser to comminicatre with 'VK' coroutine.
---
--- See 'apiR' for usage example.
-data CallRecovery =
-    ReExec MethodName MethodArgs
-  -- ^ VK program is to re-execute the method with the given parameters
-  | ReParse JSON
-  -- ^ VK program is to re-parse the JSON as if it was the result of API call in
-  -- question
-  deriving(Show)
-
 -- | Alias for 'Result'
-type R t a = Result t a
+type R t a = APIRoutine t a
 
 -- | Result of 'VK' monad execution. @t@ represents the continuation monad, which
 -- needs to track two types: the early break @t@ and the current result @a@.
@@ -33,7 +19,7 @@ type R t a = Result t a
 --
 --    * FIXME re-implement the concept using `Monad.Free` library
 --    * FIMXE clean out of test/unused constructors
-data Result t a =
+data APIRoutine t a =
     Fine a
   | APIFailed APIError
   | ExecuteAPI (MethodName, MethodArgs) (JSON -> t (R t a) (R t a))

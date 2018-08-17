@@ -248,7 +248,7 @@ cmd (GroupQ go (GroupOptions{..}))
 
   |not (null g_search_string) = do
 
-    (Sized cnt grs) <- groupSearch (tpack g_search_string)
+    grs <- groupSearch (tpack g_search_string)
 
     forM_ grs $ \gr -> do
       liftIO $ printf "%s\n" (gr_format g_output_format gr)
@@ -257,7 +257,7 @@ cmd (DBQ go (DBOptions{..}))
 
   |db_countries = do
 
-    (Sized cnt cs) <- getCountries
+    cs <- getCountries
 
     forM_ cs $ \Country{..} -> do
       liftIO $ Text.putStrLn $ Text.concat [ tshow co_int, "\t",  co_title]

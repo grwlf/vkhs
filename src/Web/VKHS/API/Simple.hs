@@ -96,9 +96,10 @@ groupSearch q =
         )
 
 -- | Get list of countries, known to VK
-getCountries :: (MonadAPI m x s) => API m x (Sized [Country])
+getCountries :: (MonadAPI m x s) => API m x [Country]
 getCountries =
-  fmap (sortBy (compare `on` co_title)) <$> do
+  sortBy (compare `on` co_title) <$> do
+  m_items <$> do
   apiSimple "database.getCountries"
     [("v",ver),
      ("need_all", "1"),

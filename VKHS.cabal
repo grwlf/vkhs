@@ -13,7 +13,7 @@ maintainer:          grrwlf@gmail.com
 copyright:           Copyright (c) 2012, Sergey Mironov
 category:            Web
 build-type:          Simple
-cabal-version:       >=1.6
+cabal-version:       >=1.8
 homepage:            http://github.com/grwlf/vkhs
 extra-source-files:  CHANGELOG.md README.md
 
@@ -66,13 +66,23 @@ library
                      filepath,
                      directory,
                      pretty-show,
-                     scientific
+                     scientific,
+                     text,
+                     regexpr
   ghc-options: -Wall -Wno-unused-imports -Wno-unused-matches
 
 executable vkq
-  hs-source-dirs:    app/vkq, app/common, src
+  hs-source-dirs:    app/vkq, app/common
   main-is:           Main.hs
   other-modules:
                      Util
-  build-depends:     regexpr,
-                     text
+  build-depends:     base>=4.6 && < 5,
+                     regexpr,
+                     text,
+                     VKHS,
+                     directory,
+                     filepath,
+                     mtl,
+                     optparse-applicative,
+                     parsec,
+                     bytestring

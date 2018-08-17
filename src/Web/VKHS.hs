@@ -81,7 +81,7 @@ type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
 
 -- | Main VK monad able to track errors, track full state 'VKState', set
 -- early exit by the means of continuation monad. VK encodes a coroutine which
--- has entry points defined by 'Result' datatype.
+-- has entry points defined by 'APIRoutine' datatype.
 --
 -- See also 'runVK' and 'apiSupervisor`.
 --
