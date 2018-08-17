@@ -27,7 +27,7 @@ let
           http-client-tls http-types mtl network-uri optparse-applicative
           parsec pipes pipes-http pretty-show split taglib tagsoup time
           utf8-string vector cabal-install zlib scientific
-          hdevtools
+          hdevtools pkgs.python3
         ];
         executableHaskellDepends = [ regexpr text haskdogs ];
         executableToolDepends = [ haskdogs hasktags ];

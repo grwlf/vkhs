@@ -70,6 +70,7 @@ instance API.ToAPIState VKState where
 instance ToGenericOptions VKState where
   toGenericOptions = go
 
+-- | Initial State constructor
 initialState :: (MonadIO m) => GenericOptions -> m VKState
 initialState go = VKState
   <$> liftIO (Client.defaultState go)
@@ -79,27 +80,31 @@ initialState go = VKState
 
 type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
 
--- | Main VK monad able to track errors, track full state 'VKState', set
--- early exit by the means of continuation monad. VK encodes a coroutine which
--- has entry points defined by 'APIRoutine' datatype.
+-- | Main VK monad transformer able to raise errors, track 'VKState', set
+-- coroutine-style exit with continuation by the means of continuation monad.
+-- Technicaly, this monad encodes a coroutine with entry points defined by
+-- 'APIRoutine' datatype.
 --
 -- See also 'runVK' and 'apiSupervisor`.
 --
 --    * FIXME Re-write using modern 'Monad.Free'
-newtype VK r a = VK { unVK :: Guts VK (StateT VKState (ExceptT VKError IO)) r a }
-  deriving(MonadIO, Functor, Applicative, Monad, MonadState VKState, MonadReader (r -> VK r r) , MonadCont)
+--
+newtype VKT m r a = VKT { unVKT :: Guts (VKT m) (StateT VKState (ExceptT VKError m)) r a }
+  deriving(MonadIO, Functor, Applicative, Monad, MonadState VKState, MonadReader (r -> VKT m r r), MonadCont)
 
-instance MonadClient (VK r) VKState
-instance MonadVK (VK r) r
-instance MonadLogin VK r VKState
-instance MonadAPI VK r VKState
+type VK r a  = VKT IO r a
 
-instance MonadClient (StateT VKState (ExceptT VKError IO)) VKState
+instance (MonadIO m) => MonadClient (VKT m r) VKState
+instance (MonadIO m) => MonadVK (VKT m r) r
+instance (MonadIO m) => MonadLogin (VKT m) r VKState
+instance (MonadIO m) => MonadAPI (VKT m) r VKState
+
+instance (MonadIO m) => MonadClient (StateT VKState (ExceptT VKError m)) VKState
 
 -- | Run the VK coroutine till next return. Consider using 'runVK' for full
 -- spinup.
-stepVK :: VK r r -> StateT VKState (ExceptT VKError IO) r
-stepVK m = runContT (runReaderT (unVK (VKHS.catch m)) undefined) return
+stepVK :: (MonadIO m) => VKT m r r -> StateT VKState (ExceptT VKError m) r
+stepVK m = runContT (runReaderT (unVKT (VKHS.catch m)) undefined) return
 
 printAPIError :: APIError -> Text
 printAPIError = \case
@@ -144,10 +149,6 @@ data VKError =
 
 printVKError :: VKError -> Text
 printVKError = \case
-  -- VKInvalidURLError err url ->
-  --   "Invalid URL: " <> err <> ":\n" <> tshow url
-  -- VKInvalidHRefError err HRef{..} ->
-  --   "Invalid HRef: \"" <> href <> "\":\n" <> printClientError err
   VKFormInputError Form{..} input ->
     "No value to fill input \"" <> input <> "\" of form \"" <> tpack form_title <> "\""
   VKLoginError e -> printLoginError e
@@ -174,7 +175,7 @@ llalert :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
 llalert str = do
     liftIO $ Text.hPutStrLn stderr str
 
-executeAPI :: MethodName -> [(String,String)] -> StateT VKState (ExceptT VKError IO) JSON
+executeAPI :: (MonadIO m) => MethodName -> [(String,String)] -> StateT VKState (ExceptT VKError m) JSON
 executeAPI mname margs = do
   llalert $ "Executing API: " <> tpack mname
 
@@ -248,7 +249,7 @@ uploadFile href filepath = do
               return urec
 
 
-loginSupervisor :: (Show a) => VK (L VK a) (L VK a) -> StateT VKState (ExceptT VKError IO) a
+loginSupervisor :: (MonadIO m, Show a) => VKT m (L (VKT m) a) (L (VKT m) a) -> StateT VKState (ExceptT VKError m) a
 loginSupervisor = go where
   go m = do
     GenericOptions{..} <- toGenericOptions <$> get
@@ -301,7 +302,7 @@ loginSupervisor = go where
 --    * FIXME Store known answers in external DB (in file?) instead of LoginState
 --      FIXME dictionary
 --    * FIXME Handle capthas (offer running standalone apps)
-apiSupervisor :: (Show a) => VK (R VK a) (R VK a) -> StateT VKState (ExceptT VKError IO) a
+apiSupervisor :: (MonadIO m, Show a) => VKT m (R (VKT m) a) (R (VKT m) a) -> StateT VKState (ExceptT VKError m) a
 apiSupervisor = go where
   go m = do
     GenericOptions{..} <- getGenericOptions
@@ -341,7 +342,7 @@ runLogin go = do
 -- | Run the VK monad @m@ using generic options @go@ and 'apiSupervisor'.
 -- Perform loginRoutine procedure if needed. This is an mid-layer runner, consider
 -- using 'runVK' instead.
-runAPI :: Show b => GenericOptions -> VK (R VK b) b -> ExceptT VKError IO b
+runAPI :: (MonadIO m, Show b) => GenericOptions -> VKT m (R (VKT m) b) b -> ExceptT VKError m b
 runAPI go@GenericOptions{..} m = do
   s <- initialState go
   flip evalStateT s $ do
@@ -356,11 +357,11 @@ runAPI go@GenericOptions{..} m = do
     apiSupervisor (m >>= return . Fine)
 
 -- | Run the VK monad @m@ using generic options @go@ and 'apiSupervisor'
-runVK :: Show a => GenericOptions -> VK (R VK a) a -> IO (Either VKError a)
+runVK :: (MonadIO m, Show a) => GenericOptions -> VKT m (R (VKT m) a) a -> m (Either VKError a)
 runVK go = runExceptT . runAPI go
 
 -- | A version of 'runVK' with unit return.
-runVK_ :: Show a => GenericOptions -> VK (R VK a) a -> IO ()
+runVK_ :: (MonadIO m, Show a) => GenericOptions -> VKT m (R (VKT m) a) a -> m ()
 runVK_ go = do
   runVK go >=> \case
     Left e -> fail (tunpack $ printVKError e)
