@@ -7,10 +7,12 @@ module Main where
 
 import Prelude hiding(putStrLn)
 import Control.Monad.Except
-import Control.Exception(SomeException(..))
+import Control.Exception(SomeException(..),handle)
 import System.Environment
+import System.FilePath(splitExtension,replaceExtension,(</>))
+import System.Directory(getTemporaryDirectory,doesFileExist)
 import System.Exit
-import System.IO(stderr)
+import System.IO(stderr,Handle,openBinaryFile,openBinaryTempFile,IOMode(..))
 import Options.Applicative
 import Text.RegexPR
 
@@ -33,6 +35,56 @@ import Web.VKHS
 import Util
 
 env_access_token = "VKQ_ACCESS_TOKEN"
+
+data MusicOptions = MusicOptions {
+    m_list_music :: Bool
+  , m_search_string :: String
+  , m_name_format :: String
+  , m_output_format :: String
+  , m_out_dir :: Maybe String
+  , m_records_id :: [String]
+  , m_skip_existing :: Bool
+  } deriving(Show)
+
+-- Open file. Return filename and handle. Don't open file if it exists
+openFileMR :: MusicOptions -> MusicRecord -> IO (FilePath, Maybe Handle)
+openFileMR mo@MusicOptions{..} mr@MusicRecord{..} =
+  case m_out_dir of
+    Nothing -> do
+      let (_,ext) = splitExtension (mr_url_str)
+      temp <- getTemporaryDirectory
+      (fp,h) <- openBinaryTempFile temp ("vkqmusic"++ext)
+      return (fp, Just h)
+    Just odir -> do
+      let (_,ext) = splitExtension mr_url_str
+      let name = mr_format m_output_format mr
+      let name' = replaceExtension name (takeWhile (/='?') ext)
+      let fp =  (odir </> name')
+      e <- doesFileExist fp
+      case (e && m_skip_existing) of
+        True -> do
+          return (fp,Nothing)
+        False -> do
+          handle (\(_::SomeException) -> do
+              Text.hPutStrLn stderr ("Failed to open file " <> tpack fp)
+              return (fp, Nothing)
+            ) $ do
+            h <- openBinaryFile fp WriteMode
+            return (fp,Just h)
+
+
+data UserOptions = UserOptions {
+    u_queryString :: String
+  } deriving(Show)
+
+data WallOptions = WallOptions {
+    w_woid :: String
+  } deriving(Show)
+
+data GroupOptions = GroupOptions {
+    g_search_string :: String
+  , g_output_format :: String
+  } deriving(Show)
 
 -- | Options to query VK database
 data DBOptions = DBOptions {

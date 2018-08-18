@@ -90,34 +90,6 @@ cutextra = gsubRegexPR "\\?extra=.*" ""
 namefilter :: String -> String
 namefilter = trim_space . one_space . normal_letters . no_html . html_amp
 
-
-
--- Open file. Return filename and handle. Don't open file if it exists
-openFileMR :: MusicOptions -> MusicRecord -> IO (FilePath, Maybe Handle)
-openFileMR mo@MusicOptions{..} mr@MusicRecord{..} =
-  case m_out_dir of
-    Nothing -> do
-      let (_,ext) = splitExtension (mr_url_str)
-      temp <- getTemporaryDirectory
-      (fp,h) <- openBinaryTempFile temp ("vkqmusic"++ext)
-      return (fp, Just h)
-    Just odir -> do
-      let (_,ext) = splitExtension mr_url_str
-      let name = mr_format m_output_format mr
-      let name' = replaceExtension name (takeWhile (/='?') ext)
-      let fp =  (odir </> name')
-      e <- doesFileExist fp
-      case (e && m_skip_existing) of
-        True -> do
-          return (fp,Nothing)
-        False -> do
-          handle (\(_::SomeException) -> do
-              hPutStrLn stderr ("Failed to open file " <> fp)
-              return (fp, Nothing)
-            ) $ do
-            h <- openBinaryFile fp WriteMode
-            return (fp,Just h)
-
 io :: (MonadIO m) => IO a -> m a
 io = liftIO
 

@@ -83,10 +83,10 @@ getUsersUrls ids = do
   return $ us`zip`(map userUrl ids)
 
 data TestState = TestState {
-    _heroId        :: Integer
-  , _heroName      :: Bool
-  , _heroUserId    :: String
-  , _heroElo       :: Maybe Integer
+    _heroId     :: Integer
+  , _heroName   :: Bool
+  , _heroUserId :: String
+  , _heroElo    :: Maybe Integer
   } deriving(Show,Eq)
 
 $(makeLenses ''TestState)
@@ -96,7 +96,6 @@ initTestState = TestState 0 False "foo" Nothing
 main :: IO ()
 main = do
   flip evalStateT initTestState $ do
-
     runVK_ defaultOptions{ o_max_request_rate_per_sec = 1} $ do
       mlgroups <- matchingGroups ["Machine Learing", "Машинное обучение", "Neural network", "Tensorflow"]
       hsgroups <- matchingGroups ["Haskell"]

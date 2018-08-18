@@ -196,29 +196,6 @@ data Verbosity = Normal | Trace | Debug
   deriving(Enum,Eq,Ord,Show)
 
 
-data MusicOptions = MusicOptions {
-    m_list_music :: Bool
-  , m_search_string :: String
-  , m_name_format :: String
-  , m_output_format :: String
-  , m_out_dir :: Maybe String
-  , m_records_id :: [String]
-  , m_skip_existing :: Bool
-  } deriving(Show)
-
-data UserOptions = UserOptions {
-    u_queryString :: String
-  } deriving(Show)
-
-data WallOptions = WallOptions {
-    w_woid :: String
-  } deriving(Show)
-
-data GroupOptions = GroupOptions {
-    g_search_string :: String
-  , g_output_format :: String
-  } deriving(Show)
-
 type MethodName = String
 type MethodArgs = [(String, Text)]
 

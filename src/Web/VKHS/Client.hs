@@ -8,6 +8,20 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Web.VKHS.Client where
 
+import qualified Data.CaseInsensitive as CI
+import qualified Data.Map as Map
+import qualified Data.Text as Text
+import qualified Data.ByteString.Char8 as BS
+import qualified Network.HTTP.Types as Client
+import qualified Network.HTTP.Client as Client
+import qualified Network.HTTP.Client.Internal as Client
+import qualified Network.URI as Client
+import qualified Network.Shpider.Forms as Shpider
+import qualified Network.HTTP.Client.MultipartFormData as Multipart
+import qualified Pipes as Pipes (Producer, for, runEffect, (>->))
+import qualified Pipes.HTTP as Pipes hiding (Request, Response)
+import qualified Text.Parsec as Parsec
+
 import Data.List
 import Data.Maybe
 import Data.Time
@@ -19,36 +33,18 @@ import Control.Monad
 import Control.Monad.State
 import Control.Monad.Cont
 import Data.Default.Class
-import qualified Data.CaseInsensitive as CI
 import Data.Map (Map)
-import qualified Data.Map as Map
 import Data.List.Split
 import Data.Text(Text)
-import qualified Data.Text as Text
 import Control.Concurrent (threadDelay)
 import System.IO as IO
 import System.IO.Unsafe as IO
 import System.Clock as Clock
-
 import Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as BS
-
 import Network.HTTP.Client ()
-import qualified Network.HTTP.Client.MultipartFormData as Multipart
 import Network.HTTP.Client.Internal (setUri)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
-import qualified Network.HTTP.Types as Client
-import qualified Network.HTTP.Client as Client
-import qualified Network.HTTP.Client.Internal as Client
-import qualified Network.URI as Client
-import qualified Network.Shpider.Forms as Shpider
-
 import Pipes.Prelude as PP (foldM)
-import qualified Pipes as Pipes (Producer, for, runEffect, (>->))
-import qualified Pipes.HTTP as Pipes hiding (Request, Response)
-
-import qualified Text.Parsec as Parsec
-
 import Debug.Trace
 
 import Web.VKHS.Types

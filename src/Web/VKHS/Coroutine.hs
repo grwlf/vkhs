@@ -28,6 +28,7 @@ data APIRoutine t a =
   | APIMessage Verbosity Text (() -> t (R t a) (R t a))
 
 
+-- | Alias for `LoginRoutine`
 type L t a = LoginRoutine t a
 
 data LoginRoutine t a =
