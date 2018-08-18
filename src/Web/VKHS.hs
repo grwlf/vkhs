@@ -12,7 +12,7 @@ module Web.VKHS (
     module Web.VKHS
   , module Web.VKHS.Client
   , module Web.VKHS.Types
-  , module Web.VKHS.Error
+  , module Web.VKHS.Coroutine
   , module Web.VKHS.Monad
   , module Web.VKHS.API
   ) where
@@ -42,7 +42,7 @@ import qualified Web.VKHS.Login as Login
 import qualified Web.VKHS.API as API
 
 import Web.VKHS.Imports
-import Web.VKHS.Error
+import Web.VKHS.Coroutine
 import Web.VKHS.Types
 import Web.VKHS.Client hiding (Response, defaultState)
 import Web.VKHS.Monad hiding (catch)
@@ -83,15 +83,15 @@ type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
 -- | Main VK monad transformer able to raise errors, track 'VKState', set
 -- coroutine-style exit with continuation by the means of continuation monad.
 -- Technicaly, this monad encodes a coroutine with entry points defined by
--- 'APIRoutine' datatype.
+-- `APIRoutine` datatype.
 --
--- See also 'runVK' and 'apiSupervisor`.
+-- See also `runVK` and `apiSupervisor`
 --
---    * FIXME Re-write using modern 'Monad.Free'
---
+-- FIXME * Re-write using modern `Monad.Free`
 newtype VKT m r a = VKT { unVKT :: Guts (VKT m) (StateT VKState (ExceptT VKError m)) r a }
   deriving(MonadIO, Functor, Applicative, Monad, MonadState VKState, MonadReader (r -> VKT m r r), MonadCont)
 
+-- | Alias for IO-based monad stack
 type VK r a  = VKT IO r a
 
 instance (MonadIO m) => MonadClient (VKT m r) VKState
@@ -100,11 +100,6 @@ instance (MonadIO m) => MonadLogin (VKT m) r VKState
 instance (MonadIO m) => MonadAPI (VKT m) r VKState
 
 instance (MonadIO m) => MonadClient (StateT VKState (ExceptT VKError m)) VKState
-
--- | Run the VK coroutine till next return. Consider using 'runVK' for full
--- spinup.
-stepVK :: (MonadIO m) => VKT m r r -> StateT VKState (ExceptT VKError m) r
-stepVK m = runContT (runReaderT (unVKT (VKHS.catch m)) undefined) return
 
 printAPIError :: APIError -> Text
 printAPIError = \case
@@ -248,6 +243,11 @@ uploadFile href filepath = do
             Right urec -> do
               return urec
 
+-- | Run the VK coroutine till next return. Consider using `runVK` for full
+-- spinup.
+stepVK :: (MonadIO m) => VKT m r r -> StateT VKState (ExceptT VKError m) r
+stepVK m = runContT (runReaderT (unVKT (VKHS.catch m)) undefined) return
+
 
 loginSupervisor :: (MonadIO m, Show a) => VKT m (L (VKT m) a) (L (VKT m) a) -> StateT VKState (ExceptT VKError m) a
 loginSupervisor = go where
@@ -297,11 +297,11 @@ loginSupervisor = go where
 -- algorithm. @apiSupervisor@ would relogin on invalid access token
 -- condition, ask for missing form fields (typically - an email/password)
 --
--- See also 'runVK'
+-- See also `runVK`
 --
---    * FIXME Store known answers in external DB (in file?) instead of LoginState
---      FIXME dictionary
---    * FIXME Handle capthas (offer running standalone apps)
+-- FIXME * Store known answers in external DB (in file?) instead of LoginState
+-- FIXME   dictionary
+-- FIXME * Handle capthas (offer running standalone apps)
 apiSupervisor :: (MonadIO m, Show a) => VKT m (R (VKT m) a) (R (VKT m) a) -> StateT VKState (ExceptT VKError m) a
 apiSupervisor = go where
   go m = do
@@ -356,11 +356,11 @@ runAPI go@GenericOptions{..} m = do
 
     apiSupervisor (m >>= return . Fine)
 
--- | Run the VK monad @m@ using generic options @go@ and 'apiSupervisor'
+-- | Run the VK monad @m@ using generic options @go@ and `apiSupervisor`
 runVK :: (MonadIO m, Show a) => GenericOptions -> VKT m (R (VKT m) a) a -> m (Either VKError a)
 runVK go = runExceptT . runAPI go
 
--- | A version of 'runVK' with unit return.
+-- | A version of `runVK` with unit return.
 runVK_ :: (MonadIO m, Show a) => GenericOptions -> VKT m (R (VKT m) a) a -> m ()
 runVK_ go = do
   runVK go >=> \case
@@ -369,8 +369,9 @@ runVK_ go = do
 
 -- | Read the access token according with respect to user-defined parameters
 --
--- See also 'modifyAccessToken'
--- FIXME: move to Utils
+-- See also `modifyAccessToken`
+--
+-- FIXME  Move to Utils
 readInitialAccessToken :: (MonadIO m, MonadState s m, ToGenericOptions s) => m (Maybe AccessToken)
 readInitialAccessToken =
   let
@@ -403,7 +404,7 @@ readInitialAccessToken =
 -- | Modify VK access token in the internal state and its external mirror
 -- if enabled, if any.
 --
--- See also 'readInitialAccessToken'
+-- See also `readInitialAccessToken`
 modifyAccessToken :: (MonadIO m, MonadState s m, ToAPIState s) => AccessToken -> m ()
 modifyAccessToken at@AccessToken{..} = do
   lldebug $ "Modifying access token, new value: " <> tshow at

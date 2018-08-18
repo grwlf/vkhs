@@ -29,14 +29,14 @@ import Control.Monad.Cont
 import Data.Map (Map)
 import Data.ByteString.Char8 (ByteString)
 import Data.Text(Text)
+import Debug.Trace
+import System.IO
+
 import Web.VKHS.Types
 import Web.VKHS.Client
 import Web.VKHS.Monad
-import Web.VKHS.Error
+import Web.VKHS.Coroutine
 import Web.VKHS.Imports
-
-import Debug.Trace
-import System.IO
 
 data LoginState = LoginState {
     ls_rights :: [AccessRight]

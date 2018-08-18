@@ -12,7 +12,7 @@ let
       , mtl, network-uri, optparse-applicative, parsec, pipes, pipes-http
       , pretty-show, regexpr, split, stdenv, taglib, tagsoup, text, time
       , utf8-string, vector, cabal-install, zlib, haskdogs, hasktags, scientific
-      , hdevtools
+      , hdevtools, lens
       }:
       mkDerivation {
         pname = "VKHS";
@@ -27,7 +27,7 @@ let
           http-client-tls http-types mtl network-uri optparse-applicative
           parsec pipes pipes-http pretty-show split taglib tagsoup time
           utf8-string vector cabal-install zlib scientific
-          hdevtools pkgs.python3
+          hdevtools pkgs.python3 lens
         ];
         executableHaskellDepends = [ regexpr text haskdogs ];
         executableToolDepends = [ haskdogs hasktags ];

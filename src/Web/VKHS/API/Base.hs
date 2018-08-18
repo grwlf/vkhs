@@ -28,7 +28,7 @@ import Web.VKHS.Imports
 import Web.VKHS.Types
 import Web.VKHS.Client hiding (Response(..))
 import Web.VKHS.Monad
-import Web.VKHS.Error
+import Web.VKHS.Coroutine
 
 import Debug.Trace
 

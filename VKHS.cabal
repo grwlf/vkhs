@@ -33,7 +33,7 @@ library
                      Web.VKHS.Monad
                      Web.VKHS.Client
                      Web.VKHS.Login
-                     Web.VKHS.Error
+                     Web.VKHS.Coroutine
                      Web.VKHS.Imports
                      Web.VKHS.API
                      Web.VKHS.API.Types

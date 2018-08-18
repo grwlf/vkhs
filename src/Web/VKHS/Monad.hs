@@ -12,6 +12,10 @@
 {-# LANGUAGE FunctionalDependencies #-}
 module Web.VKHS.Monad where
 
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
+
 import Data.List
 import Data.Maybe
 import Data.Time
@@ -23,16 +27,12 @@ import Control.Monad.Reader
 import Control.Monad.Cont
 import Data.Default.Class
 import System.IO
-
 import Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as BS
-
 import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
+
 
 import Web.VKHS.Imports
-import Web.VKHS.Error
+import Web.VKHS.Coroutine
 import Web.VKHS.Types
 import Web.VKHS.Client
 import qualified Web.VKHS.Client as Client
