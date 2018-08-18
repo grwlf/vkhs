@@ -64,8 +64,8 @@ data ClientState = ClientState {
   , cl_verbose :: Bool
   }
 
-defaultState :: GenericOptions -> IO ClientState
-defaultState GenericOptions{..} = do
+defaultClientState :: GenericOptions -> IO ClientState
+defaultClientState GenericOptions{..} = do
   cl_man <- Client.newManager
               (Client.managerSetProxy (Client.proxyEnvironment Nothing)
                 (case o_use_https of
@@ -81,17 +81,6 @@ class ToClientState s where
   modifyClientState :: (ClientState -> ClientState) -> (s -> s)
 
 class (MonadIO m, MonadState s m, ToClientState s) => MonadClient m s | m -> s
-
--- newtype ClientT m a = ClientT { unClient :: StateT ClientState m a }
---   deriving(Functor, Applicative, Monad, MonadState ClientState, MonadIO)
-
--- runClient :: (MonadIO m) => ClientT m a -> m a
--- runClient l = do
---   cl_man <- liftIO $ newManager defaultManagerSettings
---   evalStateT (unClient l) ClientState{..}
-
--- liftClient :: (Monad m) => m a -> ClientT m a
--- liftClient = ClientT . lift
 
 {-
  _   _ ____  _
@@ -223,45 +212,45 @@ requestUploadPhoto HRef{..} bs = do
           req' <- Multipart.formDataBody [Multipart.partFile "photo" bs] req
           return $ Right $ Request req' req_jar
 
-data Response = Response {
+data ClientResponse = ClientResponse {
     resp :: Client.Response (Pipes.Producer ByteString IO ())
   , resp_body :: ByteString
   }
 
-responseBodyS :: Response -> String
-responseBodyS Response{..} = BS.unpack $ resp_body
+responseBodyS :: ClientResponse -> String
+responseBodyS ClientResponse{..} = BS.unpack $ resp_body
 
-responseBody :: Response -> ByteString
-responseBody Response{..} = resp_body
+responseBody :: ClientResponse -> ByteString
+responseBody ClientResponse{..} = resp_body
 
-dumpResponseBody :: (MonadClient m s) => FilePath -> Response -> m ()
-dumpResponseBody f Response{..} = liftIO $ BS.writeFile f resp_body
+dumpResponseBody :: (MonadClient m s) => FilePath -> ClientResponse -> m ()
+dumpResponseBody f ClientResponse{..} = liftIO $ BS.writeFile f resp_body
 
-responseCookies :: Response -> Cookies
-responseCookies Response{..} = Cookies (Client.responseCookieJar resp)
+responseCookies :: ClientResponse -> Cookies
+responseCookies ClientResponse{..} = Cookies (Client.responseCookieJar resp)
 
-responseHeaders :: Response -> [(String,String)]
-responseHeaders Response{..} =
+responseHeaders :: ClientResponse -> [(String,String)]
+responseHeaders ClientResponse{..} =
   map (\(o,h) -> (BS.unpack (CI.original o), BS.unpack h)) $ Client.responseHeaders resp
 
-responseCode :: Response -> Int
-responseCode Response{..} = Client.statusCode $ Client.responseStatus resp
+responseCode :: ClientResponse -> Int
+responseCode ClientResponse{..} = Client.statusCode $ Client.responseStatus resp
 
-responseCodeMessage :: Response -> String
-responseCodeMessage Response{..} = BS.unpack $ Client.statusMessage $ Client.responseStatus resp
+responseCodeMessage :: ClientResponse -> String
+responseCodeMessage ClientResponse{..} = BS.unpack $ Client.statusMessage $ Client.responseStatus resp
 
-responseRedirect :: Response -> Maybe URL
+responseRedirect :: ClientResponse -> Maybe URL
 responseRedirect r =
   case lookup "Location" (responseHeaders r) of
     Just loc -> URL <$> Client.parseURI loc
     Nothing -> Nothing
 
-responseOK :: Response -> Bool
+responseOK :: ClientResponse -> Bool
 responseOK r = c == 200 where
   c = responseCode r
 
 -- | Execute the 'Request' created by 'requestCreatePost' or 'requestCreateGet'
-requestExecute :: (MonadClient m s) => Request -> m (Response, Cookies)
+requestExecute :: (MonadClient m s) => Request -> m (ClientResponse, Cookies)
 requestExecute Request{..} = do
   jar <- pure req_jar
   ClientState{..} <- toClientState <$> get
@@ -282,7 +271,7 @@ requestExecute Request{..} = do
       resp_body <- PP.foldM (\a b -> return $ BS.append a b) (return BS.empty) return (Client.responseBody resp)
       now <- getCurrentTime
       let (jar', _) = Client.updateCookieJar resp req now jar
-      return (Response resp resp_body, Cookies jar')
+      return (ClientResponse resp resp_body, Cookies jar')
 
 -- | Download helper
 downloadFileWith :: (MonadClient m s) => URL -> (ByteString -> IO ()) -> m ()

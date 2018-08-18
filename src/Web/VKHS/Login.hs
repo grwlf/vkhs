@@ -22,10 +22,6 @@ import Data.Set(Set)
 import Data.Either
 import Control.Category ((>>>))
 import Control.Applicative
-import Control.Monad
-import Control.Monad.State
-import Control.Monad.Writer
-import Control.Monad.Cont
 import Data.Map (Map)
 import Data.ByteString.Char8 (ByteString)
 import Data.Text(Text)
@@ -34,9 +30,16 @@ import System.IO
 
 import Web.VKHS.Types
 import Web.VKHS.Client
-import Web.VKHS.Monad
-import Web.VKHS.Coroutine
 import Web.VKHS.Imports
+
+-- | Alias for `LoginRoutine`
+type L t a = LoginRoutine t a
+
+data LoginRoutine t a =
+    LoginOK a
+  | LoginFailed LoginError
+  | LoginAskInput [Tagsoup.Tag String] Form String (String -> t (L t a) (L t a))
+  | LoginMessage Verbosity Text (() -> t (L t a) (L t a))
 
 data LoginState = LoginState {
     ls_rights :: [AccessRight]
@@ -49,8 +52,8 @@ data LoginState = LoginState {
   -- ^ Input fields that was once set explicitly
   }
 
-defaultState :: GenericOptions -> LoginState
-defaultState go@GenericOptions{..} =
+defaultLoginState :: GenericOptions -> LoginState
+defaultLoginState go@GenericOptions{..} =
   LoginState {
     ls_rights = allAccess
   , ls_appid = l_appid
@@ -81,7 +84,7 @@ type Login m x a = m (LoginRoutine m x) a
 
 
 debug :: (MonadLogin m x s) => Text -> Login m x ()
-debug text = raise (LoginMessage Debug text)
+debug text = raiseVK (LoginMessage Debug text)
 
 ensureClient :: (MonadLogin m x s) => Login m x (Either ClientError a) -> Login m x a
 ensureClient m = m >>= \case
@@ -145,7 +148,7 @@ fillForm tags f@(Form{..}) = do
                 -- trace "Using default value for " ++ input ++ " (" ++ value ++ ")" $ do
                 return (input, value)
               True -> do
-                value' <- raise (LoginAskInput tags f input)
+                value' <- raiseVK (LoginAskInput tags f input)
                 return (input, value')
     -- Replace HTTPS with HTTP if not using TLS
     let action' = (if o_use_https == False && isPrefixOf "https" (Shpider.action form) then
@@ -154,7 +157,7 @@ fillForm tags f@(Form{..}) = do
                      Shpider.action form)
     return $ FilledForm form_title form{Shpider.inputs = Map.fromList fis, Shpider.action = action'}
 
-actionRequest :: (MonadLogin m x s) => RobotAction -> Login m x (Response, Cookies)
+actionRequest :: (MonadLogin m x s) => RobotAction -> Login m x (ClientResponse, Cookies)
 actionRequest a@(DoGET url jar) = do
   debug (printAction "> " a)
   req <- ensureClient $ requestCreateGet url jar
@@ -166,7 +169,7 @@ actionRequest a@(DoPOST form jar) = do
   (res, jar') <- requestExecute req
   return (res, jar')
 
-analyzeResponse :: (MonadLogin m x s) => (Response, Cookies) -> Login m x (Either RobotAction AccessToken)
+analyzeResponse :: (MonadLogin m x s) => (ClientResponse, Cookies) -> Login m x (Either RobotAction AccessToken)
 analyzeResponse (res, jar) = do
   LoginState{..} <- toLoginState <$> get
   let tags = Tagsoup.parseTags (responseBodyS res)

@@ -40,9 +40,6 @@ import qualified Data.Aeson.Types as Aeson
 
 import Web.VKHS.Imports
 import Web.VKHS.Types
-import Web.VKHS.Monad
-import Web.VKHS.Coroutine
-import Web.VKHS.Client(requestUploadPhoto, requestExecute, responseBody, responseBodyS)
 import Web.VKHS.API.Base
 import Web.VKHS.API.Types
 
@@ -231,7 +228,7 @@ setUserPhoto UserRecord{..} photo_path =  do
 
   UploadRecord{..} <- upload ous_upload_url photo_path
 
-  Response{..} <- apiSimple "photos.saveOwnerPhoto"
+  APIResponse{..} <- apiSimple "photos.saveOwnerPhoto"
       [("server", tshow upl_server)
       ,("hash", upl_hash)
       ,("photo", upl_photo)]

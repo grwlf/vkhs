@@ -21,9 +21,8 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.Vector as Vector (head, tail)
 
-import Web.VKHS.Imports
-import Web.VKHS.Coroutine
 import Web.VKHS.Types
+import Web.VKHS.Imports
 
 import Web.VKHS.API.Base
 

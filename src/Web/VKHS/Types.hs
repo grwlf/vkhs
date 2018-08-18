@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -13,20 +14,10 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.Aeson.Encode.Pretty as Aeson
 import qualified Network.Shpider.Forms as Shpider
+import qualified Data.List as List
 
-import Data.List
-import Data.Char
-import Data.Data
-import Data.Typeable
-import Data.Text(Text)
--- import Data.Time.Clock
 import Data.Time (secondsToDiffTime,NominalDiffTime(..),UTCTime(..),diffUTCTime)
-import Data.ByteString.Char8 (ByteString)
-import Data.Aeson (FromJSON(..), ToJSON(..), (.=), (.:))
-import Control.Monad.State (MonadState(..), gets)
 import Network.URI(URI(..))
-import System.IO (stderr)
-
 import Web.VKHS.Imports
 
 -- | AccessToken is a authentication data, required by all VK API
@@ -69,7 +60,7 @@ data AccessRight
   deriving(Show, Eq, Ord, Enum)
 
 toUrlArg :: [AccessRight] -> String
-toUrlArg = intercalate "," . map (map toLower . show)
+toUrlArg = List.intercalate "," . map (map toLower . show)
 
 
 allAccess :: [AccessRight]
@@ -283,4 +274,28 @@ data DiffTime = DiffTime { dt_utc :: NominalDiffTime }
 
 diffTime :: Time -> Time -> DiffTime
 diffTime a b = DiffTime $ diffUTCTime (t_utc a) (t_utc b)
+
+class (MonadCont m, MonadReader (r -> m r) m) => MonadVK m r
+
+-- | Store early exit handler in the reader monad, run the computation @m@
+catchVK :: (MonadVK m r) => m r -> m r
+catchVK m = do
+  callCC $ \k -> do
+    local (const k) m
+
+raiseVK :: (MonadVK m r) => ((a -> m b) -> r) -> m a
+raiseVK z = callCC $ \k -> do
+  err <- ask
+  _ <- err (z k)
+  undefined
+
+terminate :: (MonadVK m r) => r -> m a
+terminate r = do
+  err <- ask
+  _ <- err r
+  undefined
+
+getGenericOptions :: (MonadState s m, ToGenericOptions s) => m GenericOptions
+getGenericOptions = gets toGenericOptions
+
 

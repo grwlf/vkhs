@@ -7,6 +7,10 @@ module Web.VKHS.Imports (
   , module Control.Monad
   , module Control.Monad.Trans
   , module Control.Monad.State
+  , module Control.Monad.Cont
+  , module Control.Monad.Reader
+  , module Control.Monad.Except
+  , module Control.Monad.Writer
   , module Control.Exception
   , module Data.Aeson
   , module Data.ByteString.Char8
@@ -24,9 +28,11 @@ module Web.VKHS.Imports (
   , module Data.Typeable
   , module Data.Data
   , module Data.Scientific
+  , module Debug.Trace
   , module Text.Printf
   , module Text.Show.Pretty
   , module Text.Read
+  , module System.IO
   ) where
 
 import qualified Data.ByteString.Char8 as ByteString
@@ -38,6 +44,10 @@ import Control.Applicative ((<$>), (<*>), (<|>), pure)
 import Control.Monad
 import Control.Monad.Trans
 import Control.Monad.State
+import Control.Monad.Cont
+import Control.Monad.Reader
+import Control.Monad.Except
+import Control.Monad.Writer
 import Control.Exception (SomeException(..),try,catch,bracket)
 import Data.Aeson ((.=), (.:), (.:?), (.!=), FromJSON)
 import Data.Typeable
@@ -55,10 +65,11 @@ import Data.Text (Text)
 import Data.Text.IO (putStrLn, hPutStrLn)
 import Data.List (head, length, sortBy, (++))
 import Data.Set (Set)
+import Debug.Trace
 import Text.Printf
 import Text.Show.Pretty
 import Text.Read (readMaybe)
-import System.IO (Handle)
+import System.IO (stdout,stderr,Handle)
 
 bspack :: ByteString -> Text
 bspack = tpack . ByteString.unpack
