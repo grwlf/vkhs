@@ -6,7 +6,7 @@ import Web.VKHS
 import Web.VKHS.Imports
 
 main :: IO ()
-main = runVK_ defaultOptions { o_verbose = False, o_max_request_rate_per_sec = 1.5 } $ do
+main = runVK_ defaultOptions { o_verbosity = Normal, o_max_request_rate_per_sec = 1.5 } $ do
   Sized cnt gs <- groupSearch "Битлз"
   forM_ gs $ \gr@GroupRecord{..} -> do
     liftIO $ tputStrLn gr_name

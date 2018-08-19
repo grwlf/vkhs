@@ -33,7 +33,7 @@ whileM m = do
 
 -- FIXME: return many invalid posts
 main :: IO ()
-main = runVK_ defaultOptions { o_verbose = False } $ do
+main = runVK_ defaultOptions { o_verbosity = Normal } $ do
 
   Just wr0 <- getWallById post_id
 

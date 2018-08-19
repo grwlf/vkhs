@@ -73,7 +73,7 @@ defaultClientState GenericOptions{..} = do
                   False -> Client.defaultManagerSettings))
   cl_last_execute <- pure (TimeSpec 0 0)
   cl_minimum_interval_ns <- pure (round ((((10::Rational)^(9::Integer)))  / o_max_request_rate_per_sec))
-  cl_verbose <- pure o_verbose
+  cl_verbose <- pure (o_verbosity == Debug)
   return ClientState{..}
 
 class ToClientState s where
@@ -88,6 +88,7 @@ class (MonadIO m, MonadState s m, ToClientState s) => MonadClient m s | m -> s
 | | | | |_) | |
 | |_| |  _ <| |___
  \___/|_| \_\_____|
+
 -}
 
 newtype URL_Protocol = URL_Protocol { urlproto :: String }
@@ -159,13 +160,13 @@ cookiesCreate () = Cookies (Client.createCookieJar [])
 |_| |_| |_|   |_| |_|
 -}
 
-data Request = Request {
+data ClientRequest = ClientRequest {
     req :: Client.Request
   , req_jar :: Client.CookieJar
   }
 
 -- | Create HTTP(S) GET request
-requestCreateGet :: (MonadClient m s) => URL -> Cookies -> m (Either ClientError Request)
+requestCreateGet :: (MonadClient m s) => URL -> Cookies -> m (Either ClientError ClientRequest)
 requestCreateGet URL{..} Cookies{..} = do
   case setUri Client.defaultRequest uri of
     Left exc -> do
@@ -174,7 +175,7 @@ requestCreateGet URL{..} Cookies{..} = do
     Right r -> do
       now <- liftIO getCurrentTime
       (r',_) <- pure $ Client.insertCookiesIntoRequest r jar now
-      return $ Right $ Request {
+      return $ Right $ ClientRequest {
           req = r'{
               Client.redirectCount = 0
             },
@@ -182,7 +183,7 @@ requestCreateGet URL{..} Cookies{..} = do
       }
 
 -- | Create HTTP(S) POST request
-requestCreatePost :: (MonadClient m s) => FilledForm -> Cookies -> m (Either ClientError Request)
+requestCreatePost :: (MonadClient m s) => FilledForm -> Cookies -> m (Either ClientError ClientRequest)
 requestCreatePost (FilledForm tit Shpider.Form{..}) c = do
   case Client.parseURI (Client.escapeURIString Client.isAllowedInURI action) of
     Nothing -> return (Left (ErrorParseURL (Text.pack action) "parseURI failed"))
@@ -191,15 +192,15 @@ requestCreatePost (FilledForm tit Shpider.Form{..}) c = do
       case r of
         Left err -> do
           return $ Left err
-        Right Request{..} -> do
-          return $ Right $ Request (Client.urlEncodedBody (map (BS.pack *** BS.pack) $ Map.toList inputs) req) req_jar
+        Right ClientRequest{..} -> do
+          return $ Right $ ClientRequest (Client.urlEncodedBody (map (BS.pack *** BS.pack) $ Map.toList inputs) req) req_jar
 
 -- | Upload the bytestring data @bs@ to the server @text_url@
 --
 --     * FIXME Use 'URL' rather than Text. Think about
 --       https://github.com/blamario/network-uri
 --
-requestUploadPhoto :: (MonadClient m s) => HRef -> String -> m (Either ClientError Request)
+requestUploadPhoto :: (MonadClient m s) => HRef -> String -> m (Either ClientError ClientRequest)
 requestUploadPhoto HRef{..} bs = do
   case Client.parseURI (Text.unpack href) of
     Nothing -> return (Left (ErrorParseURL href "parseURI failed"))
@@ -208,9 +209,9 @@ requestUploadPhoto HRef{..} bs = do
       case r of
         Left err -> do
           return $ Left err
-        Right Request{..} -> do
+        Right ClientRequest{..} -> do
           req' <- Multipart.formDataBody [Multipart.partFile "photo" bs] req
-          return $ Right $ Request req' req_jar
+          return $ Right $ ClientRequest req' req_jar
 
 data ClientResponse = ClientResponse {
     resp :: Client.Response (Pipes.Producer ByteString IO ())
@@ -250,8 +251,8 @@ responseOK r = c == 200 where
   c = responseCode r
 
 -- | Execute the 'Request' created by 'requestCreatePost' or 'requestCreateGet'
-requestExecute :: (MonadClient m s) => Request -> m (ClientResponse, Cookies)
-requestExecute Request{..} = do
+requestExecute :: (MonadClient m s) => ClientRequest -> m (ClientResponse, Cookies)
+requestExecute ClientRequest{..} = do
   jar <- pure req_jar
   ClientState{..} <- toClientState <$> get
   clk <- liftIO $ do
@@ -277,6 +278,6 @@ requestExecute Request{..} = do
 downloadFileWith :: (MonadClient m s) => URL -> (ByteString -> IO ()) -> m ()
 downloadFileWith url h = do
   (ClientState{..}) <- toClientState <$> get
-  (Right Request{..}) <- requestCreateGet url (cookiesCreate ())
+  (Right ClientRequest{..}) <- requestCreateGet url (cookiesCreate ())
   liftIO $ Pipes.withHTTP req cl_man $ \resp -> do
       PP.foldM (\() a -> h a) (return ()) (const (return ())) (Client.responseBody resp)

@@ -141,7 +141,7 @@ data GenericOptions = GenericOptions {
     o_login_host :: String
   , o_api_host :: String
   , o_port :: Int
-  , o_verbose :: Bool
+  , o_verbosity :: Verbosity
   , o_use_https :: Bool
   , o_max_request_rate_per_sec :: Rational
   -- ^ How many requests per second is allowed
@@ -167,7 +167,7 @@ defaultOptions = GenericOptions {
     o_login_host = "oauth.vk.com"
   , o_api_host = "api.vk.com"
   , o_port = 443
-  , o_verbose = False
+  , o_verbosity = Normal
   , o_use_https = True
   , o_max_request_rate_per_sec = 2
   , o_allow_interactive = True
@@ -275,27 +275,32 @@ data DiffTime = DiffTime { dt_utc :: NominalDiffTime }
 diffTime :: Time -> Time -> DiffTime
 diffTime a b = DiffTime $ diffUTCTime (t_utc a) (t_utc b)
 
-class (MonadCont m, MonadReader (r -> m r) m) => MonadVK m r
+class (MonadCont m, MonadReader (r -> m r) m) => MonadVK m r s | m -> s where
+  getVKState :: m s
+  putVKState :: s -> m ()
+
+modifyVKState :: MonadVK m r s => (s -> s) -> m ()
+modifyVKState f = getVKState >>= putVKState . f
 
 -- | Store early exit handler in the reader monad, run the computation @m@
-catchVK :: (MonadVK m r) => m r -> m r
+catchVK :: (MonadVK m r s) => m r -> m r
 catchVK m = do
   callCC $ \k -> do
     local (const k) m
 
-raiseVK :: (MonadVK m r) => ((a -> m b) -> r) -> m a
+raiseVK :: (MonadVK m r s) => ((a -> m b) -> r) -> m a
 raiseVK z = callCC $ \k -> do
   err <- ask
   _ <- err (z k)
   undefined
 
-terminate :: (MonadVK m r) => r -> m a
+terminate :: (MonadVK m r s) => r -> m a
 terminate r = do
   err <- ask
   _ <- err r
   undefined
 
-getGenericOptions :: (MonadState s m, ToGenericOptions s) => m GenericOptions
-getGenericOptions = gets toGenericOptions
+-- getGenericOptions :: (MonadState s m, ToGenericOptions s) => m GenericOptions
+-- getGenericOptions = gets toGenericOptions
 
 

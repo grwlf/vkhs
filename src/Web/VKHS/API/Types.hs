@@ -10,6 +10,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Web.VKHS.API.Types where
@@ -78,7 +79,7 @@ instance FromJSON RepostRecord where
       <*> (o .: "profiles")
 
 data UserId = UserId { uid_id :: Integer }
-  deriving(Show, Data, Eq, Ord, Typeable)
+  deriving(Show, Data, Eq, Ord, Typeable, Generic, Hashable)
 
 instance FromJSON UserId where
   parseJSON j = UserId <$> (Aeson.parseJSON j)
@@ -91,6 +92,8 @@ data UserRecord = UserRecord
   , ur_hidden :: Maybe Integer
   , ur_city :: Maybe City
   , ur_country :: Maybe Country
+  , ur_bdate :: Maybe Text
+  , ur_education :: Maybe Text
   -- , ur_photo :: String
   -- , ur_university :: Maybe Int
   -- , ur_university_name :: Maybe String
@@ -109,6 +112,18 @@ instance FromJSON UserRecord where
       <*> (o .:? "hidden")
       <*> (o .:? "city")
       <*> (o .:? "country")
+      <*> (o .:? "bdate")
+      <*> (o .:? "education")
+
+printUserBio :: UserRecord -> Text
+printUserBio UserRecord{..} =
+  userUrl ur_uid <> " " <>
+  "name \""<> ur_first_name <> " " <> ur_last_name <> "\", " <>
+  "birth \"" <> (maybe "?" id ur_bdate) <> "\", " <>
+  "city \"" <> (maybe "?" (c_title) ur_city) <> "\""
+
+userUrl :: UserId -> Text
+userUrl (UserId x) = "https://vk.com/id" <> tshow x
 
 -- | Wall post representation (partial)
 --
@@ -178,7 +193,7 @@ data GroupIsClosed = GroupOpen | GroupClosed | GroupPrivate
   deriving(Show,Eq,Ord,Enum,Data,Typeable)
 
 data GroupId = GroupId { gid_id :: Integer }
-  deriving(Show,Eq,Ord,Data,Typeable)
+  deriving(Show,Eq,Ord,Data,Typeable,Generic,Hashable)
 
 data GroupRecord = GroupRecord {
     gr_gid :: GroupId

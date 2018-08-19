@@ -6,6 +6,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | TODO: Rename to Coroutine.hs
 module Web.VKHS.Coroutine where
@@ -28,9 +29,9 @@ import Web.VKHS.Imports
 import Web.VKHS.Client (ToClientState(..), ClientState(..), MonadClient,
                         urlCreate, URL_Protocol(..), URL_Host(..), URL_Port(..), URL_Path(..),
                         buildQuery, requestCreateGet, cookiesCreate, requestExecute, requestUploadPhoto,
-                        responseBody, requestExecute, defaultClientState)
+                        responseBody, requestExecute, defaultClientState, dumpResponseBody, requestCreatePost)
 import Web.VKHS.Login (MonadLogin, LoginState(..), ToLoginState(..), printForm, loginRoutine, LoginRoutine(..), L,
-                       defaultLoginState)
+                       defaultLoginState, RobotAction(..), printAction, ensureClient)
 import Web.VKHS.API (MonadAPI, APIState(..), ToAPIState(..), APIResponse(..), APIRoutine(..), R, defaultAPIState)
 
 -- | Main state of the VK monad stack. Consists of lesser states plus a copy of
@@ -73,17 +74,25 @@ type Guts x m r a = ReaderT (r -> x r r) (ContT r m) a
 --
 -- FIXME * Re-write using modern `Monad.Free`
 newtype VKT m r a = VKT { unVKT :: Guts (VKT m) (StateT VKState (ExceptT VKError m)) r a }
-  deriving(MonadIO, Functor, Applicative, Monad, MonadState VKState, MonadReader (r -> VKT m r r), MonadCont)
+  deriving(MonadIO, Functor, Applicative, Monad, MonadReader (r -> VKT m r r), MonadCont)
+
+
 
 -- | Alias for IO-based monad stack
 type VK r a  = VKT IO r a
 
-instance (MonadIO m) => MonadClient (VKT m r) VKState
-instance (MonadIO m) => MonadVK (VKT m r) r
+instance (MonadIO m) => MonadVK (VKT m r) r VKState where
+  getVKState = VKT $ get
+  putVKState = VKT . put
+
+-- instance (MonadIO m) => MonadClient (VKT m r) VKState
 instance (MonadIO m) => MonadLogin (VKT m) r VKState
 instance (MonadIO m) => MonadAPI (VKT m) r VKState
-
 instance (MonadIO m) => MonadClient (StateT VKState (ExceptT VKError m)) VKState
+
+instance (MonadState s m) => MonadState s (VKT m r) where
+  get = VKT $ lift $ lift $ lift $ lift $ get
+  put = VKT . lift . lift . lift . lift . put
 
 printAPIError :: APIError -> Text
 printAPIError = \case
@@ -121,6 +130,7 @@ printVKJSONError = \case
 data VKError =
     VKFormInputError Form Text
   | VKLoginError LoginError
+  | VKLoginRequestError ClientError
   | VKUploadError FilePath (Either ClientError VKJSONError)
   | VKExecAPIError MethodName (Either ClientError VKJSONError)
   | VKAPIError APIError
@@ -137,26 +147,29 @@ printVKError = \case
     "Failed execute method \"" <> tpack mname <> "\": " <> either printClientError printVKJSONError e
   VKAPIError e ->
     "API program failed: " <> printAPIError e
-
-
-lldebug :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
-lldebug str = do
-  GenericOptions{..} <- gets toGenericOptions
-  when o_verbose $ do
-    liftIO $ Text.hPutStrLn stderr str
+  VKLoginRequestError ce ->
+    "Unable to execute login procedure, " <> printClientError ce
 
 llprompt :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
 llprompt str = do
     liftIO $ Text.hPutStrLn stderr str
     liftIO $ Text.hPutStr stderr "> "
 
-llalert :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
-llalert str = do
+llmessage :: (ToGenericOptions s, MonadState s m, MonadIO m) => Verbosity -> Text -> m ()
+llmessage verb str = do
+  GenericOptions{..} <- gets toGenericOptions
+  when (verb <= o_verbosity) $ do
     liftIO $ Text.hPutStrLn stderr str
+
+llalert :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
+llalert str = llmessage Normal str
+
+lldebug :: (ToGenericOptions s, MonadState s m, MonadIO m) => Text -> m ()
+lldebug str = llmessage Debug str
 
 executeAPI :: (MonadIO m) => MethodName -> [(String,String)] -> StateT VKState (ExceptT VKError m) JSON
 executeAPI mname margs = do
-  llalert $ "Executing API: " <> tpack mname
+  lldebug $ "Executing API: " <> tpack mname
 
   GenericOptions{..} <- gets toGenericOptions
   APIState{..} <- gets toAPIState
@@ -236,6 +249,7 @@ stepVK m = runContT (runReaderT (unVKT (catchVK m)) undefined) return
 loginSupervisor :: (MonadIO m, Show a) => VKT m (L (VKT m) a) (L (VKT m) a) -> StateT VKState (ExceptT VKError m) a
 loginSupervisor = go where
   go m = do
+    let throwLoginError x = throwError (VKLoginRequestError x)
     GenericOptions{..} <- toGenericOptions <$> get
     res <- stepVK m
     case res of
@@ -268,9 +282,30 @@ loginSupervisor = go where
           (False,_) -> do
             throwError (VKFormInputError form (tpack i))
 
+      LoginRequestExecute ra k -> do
+        case ra of
+          a@(DoGET url jar) -> do
+            lldebug (printAction "> " a)
+            mreq <- requestCreateGet url jar
+            case mreq of
+              Left err -> throwLoginError err
+              Right req -> do
+                (cres, jar') <- requestExecute req
+                dumpResponseBody "latest.html" cres
+                go (k (cres, jar'))
+
+          a@(DoPOST form jar) -> do
+            lldebug (printAction "> " a)
+            mreq <- requestCreatePost form jar
+            case mreq of
+              Left err -> throwLoginError err
+              Right req -> do
+                (cres, jar') <- requestExecute req
+                dumpResponseBody "latest.html" cres
+                go (k (cres, jar'))
+
       LoginMessage verb text k -> do
-        when ((verb < Debug) || o_verbose) $ do
-          llalert text
+        llmessage verb text
         go (k ())
 
       LoginFailed e -> do
@@ -289,7 +324,7 @@ loginSupervisor = go where
 apiSupervisor :: (MonadIO m, Show a) => VKT m (R (VKT m) a) (R (VKT m) a) -> StateT VKState (ExceptT VKError m) a
 apiSupervisor = go where
   go m = do
-    GenericOptions{..} <- getGenericOptions
+    GenericOptions{..} <- toGenericOptions <$> get
     res <- stepVK m
     case res of
 
@@ -300,8 +335,7 @@ apiSupervisor = go where
         throwError (VKAPIError e)
 
       APIMessage verb text k -> do
-        when ((verb < Debug) || o_verbose) $ do
-          llalert text
+        llmessage verb text
         go (k ())
 
       ExecuteAPI (mname,margs) k -> do
@@ -314,6 +348,7 @@ apiSupervisor = go where
 
       APILogin k -> do
         at <- loginSupervisor (loginRoutine >>= return . LoginOK)
+        modifyAccessToken at
         go (k at)
 
 -- | Run loginRoutine procedure using 'apiSupervisor'. Return 'AccessToken' on
@@ -365,7 +400,7 @@ readInitialAccessToken =
       liftIO $ catch (Just <$> readFile fn) (\(e :: SomeException) -> return Nothing)
 
   in do
-  GenericOptions{..} <- getGenericOptions
+  GenericOptions{..} <- toGenericOptions <$> get
   case l_access_token of
    [] -> do
     lldebug "Initial access token is empty"
@@ -393,7 +428,7 @@ modifyAccessToken :: (MonadIO m, MonadState s m, ToAPIState s) => AccessToken ->
 modifyAccessToken at@AccessToken{..} = do
   lldebug $ "Modifying access token, new value: " <> tshow at
   modify $ modifyAPIState (\as -> as{api_access_token = at_access_token})
-  GenericOptions{..} <- getGenericOptions
+  GenericOptions{..} <- toGenericOptions <$> get
   case l_access_token_file of
     [] -> return ()
     fl -> do

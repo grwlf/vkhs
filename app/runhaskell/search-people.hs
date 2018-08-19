@@ -36,9 +36,9 @@ printMatching = runVK_ defaultOptions $ do
 
 
 -- matchingGroups :: [String] -> IO [GroupId]
-matchingGroups keyords = do
+matchingGroups kws = do
     List.concat <$> (
-      forM keyords $ \kw-> do
+      forM kws $ \kw-> do
         m_items <$> groupSearch kw)
 
 main :: IO ()

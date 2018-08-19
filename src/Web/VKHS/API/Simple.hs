@@ -74,11 +74,15 @@ apiSimpleH nm args handlerA handlerB = do
     Right a -> return (handlerA a)
 
 
-
 -- | Wrapper for 'groups.search' handler. The function demonstrates
 -- pure-functional error handling.
 groupSearch :: (MonadAPI m x s) => Text -> API m x [GroupRecord]
 groupSearch q =
+  trace (\gr ->
+    case length gr < 10 of
+      True -> "groupSearch: keyword \"" <> q <> "\" returnes: " <> Text.intercalate "," (map gr_name gr)
+      False -> "groupSearch: keyword \"" <> q <> "\" returnes: " <> tshow (length gr) <> " groups"
+      ) $ do
   sortBy (compare `on` gr_members_count) <$> do
     m_items <$> do
       apiSimpleH "groups.search"
@@ -205,15 +209,17 @@ getPhotoUploadServer Album{..} =
 
 
 getUsers :: (MonadAPI m x s) => [UserId] -> API m x [UserRecord]
+getUsers [] = return []
 getUsers uids = do
   apiSimple "users.get" [
       ("user_ids", Text.intercalate "," [tshow x | UserId x <- uids])
-    , ("fields", "city,country")
+    , ("fields", "city,country,bdate,education")
     ]
 
 -- | Get current user
 getCurrentUser :: (MonadAPI m x s) => API m x UserRecord
 getCurrentUser = do
+  trace (\UserRecord{..} -> "getCurrentUser: returned " <> tshow ur_uid) $ do
   users <- apiSimple "users.get" []
   case (length users == 1) of
     False -> terminate $ APIFailed $ APIUnexpected "users.get" "should be and array containing a single user record"
@@ -229,16 +235,32 @@ setUserPhoto UserRecord{..} photo_path =  do
   UploadRecord{..} <- upload ous_upload_url photo_path
 
   APIResponse{..} <- apiSimple "photos.saveOwnerPhoto"
-      [("server", tshow upl_server)
-      ,("hash", upl_hash)
-      ,("photo", upl_photo)]
+      [ ("server", tshow upl_server)
+      , ("hash", upl_hash)
+      , ("photo", upl_photo)
+      ]
   PhotoSaveResult{..} <- pure (fst resp_data)
   return ()
 
-getGroupMembers :: (MonadAPI m x s) => GroupId -> API m x [UserId]
-getGroupMembers GroupId{..} =
+getGroupMembersN :: (MonadAPI m x s) => Integer -> GroupId -> API m x [UserId]
+getGroupMembersN offset GroupId{..} =
+  trace (\uids ->
+      "getGroupMembers: group " <> tshow gid_id <>
+      " offset " <> tshow offset <>
+      " includes : " <> (
+      case length uids < 10 of
+        True -> tshow uids
+        False -> tshow (length uids) <> " users")
+      ) $ do
   m_items <$>
     (apiSimple "groups.getMembers"
       [ ("group_id", tshow gid_id)
+      , ("offset", tshow offset)
       , ("count", tshow max_count)
+      , ("fileds", "bdate,city,education")
       ])
+
+getGroupMembers :: (MonadAPI m x s) => GroupId -> API m x [UserId]
+getGroupMembers = getGroupMembersN 0
+
+

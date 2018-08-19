@@ -29,7 +29,11 @@ import Debug.Trace
 import System.IO
 
 import Web.VKHS.Types
-import Web.VKHS.Client
+import Web.VKHS.Client (ToClientState(..), ClientState(..), MonadClient,
+                        urlCreate, URL_Protocol(..), URL_Host(..), URL_Port(..), URL_Path(..),
+                        buildQuery, requestCreateGet, cookiesCreate, responseBody, defaultClientState,
+                        ClientRequest(..), ClientResponse(..), Cookies(..), requestCreatePost,
+                        responseBodyS, responseRedirect, urlFragments)
 import Web.VKHS.Imports
 
 -- | Alias for `LoginRoutine`
@@ -39,6 +43,7 @@ data LoginRoutine t a =
     LoginOK a
   | LoginFailed LoginError
   | LoginAskInput [Tagsoup.Tag String] Form String (String -> t (L t a) (L t a))
+  | LoginRequestExecute RobotAction ((ClientResponse,Cookies) -> t (L t a) (L t a))
   | LoginMessage Verbosity Text (() -> t (L t a) (L t a))
 
 data LoginState = LoginState {
@@ -69,7 +74,7 @@ class (ToGenericOptions s) => ToLoginState s where
 -- class (MonadIO m, MonadClient m s, ToLoginState s, MonadVK m r) => MonadLogin m r s | m -> s
 -- | Class of monads able to run VK API calls. @m@ - the monad itself, @x@ -
 -- type of early error, @s@ - type of state (see alse @ToAPIState@)
-class (MonadIO (m (L m x)), MonadClient (m (L m x)) s, ToLoginState s, MonadVK (m (L m x)) (L m x)) =>
+class (MonadIO (m (L m x)), ToLoginState s, MonadVK (m (L m x)) (L m x) s) =>
   MonadLogin m x s | m -> s
 
 -- | Login robot action
@@ -93,8 +98,8 @@ ensureClient m = m >>= \case
 
 initialAction :: (MonadLogin m x s) => Login m x RobotAction
 initialAction = do
-  LoginState{..} <- gets toLoginState
-  GenericOptions{..} <- gets toGenericOptions
+  LoginState{..} <- toLoginState <$> getVKState
+  GenericOptions{..} <- toGenericOptions <$> getVKState
   let
     protocol = (case o_use_https of
                   True -> "https"
@@ -127,13 +132,13 @@ printForm prefix Shpider.Form{..} =
 
 fillForm :: (MonadLogin m x s) => [Tagsoup.Tag String] -> Form -> Login m x FilledForm
 fillForm tags f@(Form{..}) = do
-    LoginState{..} <- toLoginState <$> get
-    GenericOptions{..} <- gets toGenericOptions
+    LoginState{..} <- toLoginState <$> getVKState
+    GenericOptions{..} <- toGenericOptions <$> getVKState
     let empty_inputs = Set.fromList $ Shpider.emptyInputs form
     let cleared_inputs = empty_inputs `Set.intersection` ls_touched_inputs
     case Set.null cleared_inputs  of
       True -> do
-        modify $ modifyLoginState (\s -> s{ls_touched_inputs = empty_inputs`Set.union`ls_touched_inputs})
+        modifyVKState $ modifyLoginState (\s -> s{ls_touched_inputs = empty_inputs`Set.union`ls_touched_inputs})
       False -> do
         terminate (LoginFailed $ LoginInvalidInputs f cleared_inputs)
     fis <-
@@ -158,25 +163,17 @@ fillForm tags f@(Form{..}) = do
     return $ FilledForm form_title form{Shpider.inputs = Map.fromList fis, Shpider.action = action'}
 
 actionRequest :: (MonadLogin m x s) => RobotAction -> Login m x (ClientResponse, Cookies)
-actionRequest a@(DoGET url jar) = do
-  debug (printAction "> " a)
-  req <- ensureClient $ requestCreateGet url jar
-  (res, jar') <- requestExecute req
-  return (res, jar')
-actionRequest a@(DoPOST form jar) = do
-  debug (printAction "> " a)
-  req <- ensureClient $ requestCreatePost form jar
-  (res, jar') <- requestExecute req
+actionRequest ra = do
+  (res, jar') <- raiseVK (LoginRequestExecute ra)
   return (res, jar')
 
 analyzeResponse :: (MonadLogin m x s) => (ClientResponse, Cookies) -> Login m x (Either RobotAction AccessToken)
 analyzeResponse (res, jar) = do
-  LoginState{..} <- toLoginState <$> get
+  LoginState{..} <- toLoginState <$> getVKState
   let tags = Tagsoup.parseTags (responseBodyS res)
       title = Shpider.gatherTitle tags
 
   forms <- pure $ map (Form title) (Shpider.gatherForms tags)
-  dumpResponseBody "latest.html" res
   debug ("< 0 Title: " <> tpack title)
 
   case (responseRedirect res) of

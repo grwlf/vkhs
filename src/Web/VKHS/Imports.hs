@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 -- | This module re-imports common declarations used across the VKHS library
 module Web.VKHS.Imports (
     module Web.VKHS.Imports
@@ -22,13 +24,16 @@ module Web.VKHS.Imports (
   , module Data.List
   , module Data.Set
   , module Data.Function
+  , module Data.Function.Flippers
   , module Data.Either
   , module Data.Maybe
   , module Data.Map
+  , module Data.Hashable
   , module Data.Typeable
   , module Data.Data
   , module Data.Scientific
   , module Debug.Trace
+  , module GHC.Generics
   , module Text.Printf
   , module Text.Show.Pretty
   , module Text.Read
@@ -59,13 +64,16 @@ import Data.Scientific (Scientific, FPFormat(..))
 import Data.Either
 import Data.Maybe
 import Data.Map(Map)
+import Data.Hashable
 import Data.Monoid((<>))
 import Data.Function (on)
+import Data.Function.Flippers
 import Data.Text (Text)
 import Data.Text.IO (putStrLn, hPutStrLn)
 import Data.List (head, length, sortBy, (++))
 import Data.Set (Set)
-import Debug.Trace
+import Debug.Trace hiding (trace)
+import GHC.Generics(Generic)
 import Text.Printf
 import Text.Show.Pretty
 import Text.Read (readMaybe)
@@ -88,4 +96,15 @@ tputStrLn t = liftIO $ Data.Text.IO.putStrLn t
 
 thPutStrLn :: MonadIO m => Handle -> Text -> m ()
 thPutStrLn h t = liftIO $ Data.Text.IO.hPutStrLn h t
+
+whileM :: (Monad m) => t -> b -> (t -> b -> m (Maybe t, b)) -> m b
+whileM i s f = do
+  (mbi,s') <- f i s
+  case mbi of
+    Just i' -> whileM i' s' f
+    Nothing -> return s'
+
+whileM_ :: (Monad m) => t -> (t -> m (Maybe t)) -> m ()
+whileM_ i f = whileM i () (\i () -> (,()) <$> f i)
+
 

@@ -66,9 +66,9 @@ instance (FromJSON a) => FromJSON (APIResponse a) where
       <*> (((,) <$> (o .: "error") <*> pure False) <|> ((,) <$> (o .: "response") <*> pure True))
       ) j
 
-type Cache = Map (MethodName,MethodArgs) (JSON,Time)
+type APICache = Map (MethodName,MethodArgs) (JSON,Time)
 
-cacheQuery :: DiffTime -> MethodName -> MethodArgs -> Time -> Cache -> Maybe JSON
+cacheQuery :: DiffTime -> MethodName -> MethodArgs -> Time -> APICache -> Maybe JSON
 cacheQuery maxage mname margs time c =
   case Map.lookup (mname,margs) c of
     Just (json,birth) ->
@@ -77,16 +77,16 @@ cacheQuery maxage mname margs time c =
         False -> Just json
     Nothing -> Nothing
 
-cacheAdd :: MethodName -> MethodArgs -> JSON -> Time -> Cache -> Cache
+cacheAdd :: MethodName -> MethodArgs -> JSON -> Time -> APICache -> APICache
 cacheAdd mname margs json time = Map.insert (mname,margs) (json,time)
 
-cacheFilter :: DiffTime -> Time -> Cache -> Cache
+cacheFilter :: DiffTime -> Time -> APICache -> APICache
 cacheFilter maxage now = Map.filter (\(_,t) -> (now`diffTime`t) < maxage)
 
-cacheSave :: FilePath -> Cache -> IO ()
+cacheSave :: FilePath -> APICache -> IO ()
 cacheSave fp c = writeFile fp (show c)
 
-cacheLoad :: FilePath -> IO (Maybe Cache)
+cacheLoad :: FilePath -> IO (Maybe APICache)
 cacheLoad fp =
   let
     safeReadFile fn = do
@@ -97,7 +97,7 @@ cacheLoad fp =
 -- | State of the API engine
 data APIState = APIState {
     api_access_token :: String
-  , api_state_cache :: Cache
+  , api_state_cache :: APICache
   } deriving (Show)
 
 defaultAPIState :: APIState
@@ -112,7 +112,7 @@ class ToGenericOptions s => ToAPIState s where
 
 -- | Class of monads able to run VK API calls. @m@ - the monad itself, @x@ -
 -- type of early error, @s@ - type of state (see alse @ToAPIState@)
-class (MonadIO (m (R m x)), MonadState s (m (R m x)), ToAPIState s, MonadVK (m (R m x)) (R m x)) =>
+class (MonadIO (m (R m x)), ToAPIState s, MonadVK (m (R m x)) (R m x) s) =>
   MonadAPI m x s | m -> s
 
 
@@ -137,6 +137,9 @@ message verb text = raiseVK (APIMessage verb text)
 
 debug :: (MonadAPI m x s) => Text -> API m x ()
 debug = message Debug
+
+trace :: (MonadAPI m x s) => (a -> Text) -> API m x a ->  API m x a
+trace f m = m >>= \a -> message Trace ("> " <> (f a)) >> return a
 
 api1 :: forall m x a s . (Aeson.FromJSON a, MonadAPI m x s)
     => MethodName -- ^ API method name

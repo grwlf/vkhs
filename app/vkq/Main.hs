@@ -132,7 +132,7 @@ optdesc m =
         <$> (pure $ o_login_host defaultOptions)
         <*> (pure $ o_api_host defaultOptions)
         <*> (pure $ o_port defaultOptions)
-        <*> flag False True (long "verbose" <> help "Be verbose")
+        <*> flag Normal Debug (long "verbose" <> help "Be verbose")
         <*> (pure $ o_use_https defaultOptions)
         <*> fmap (read . tunpack) (tpack <$> strOption (value (show $ o_max_request_rate_per_sec defaultOptions) <> long "req-per-sec" <> metavar "N" <> help "Max number of requests per second"))
         <*> flag True False (long "interactive" <> help "Allow interactive queries")
@@ -259,7 +259,6 @@ cmd (Login go LoginOptions{..}) = do
   case l_eval of
     True -> liftIO $ putStrLn $ Text.pack $ printf "export %s=%s\n" env_access_token at_access_token
     False -> do
-      modifyAccessToken at
       liftIO $ putStrLn $ Text.pack at_access_token
 
 -- API / CALL
