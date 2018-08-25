@@ -80,8 +80,8 @@ groupSearch :: (MonadAPI m x s) => Text -> API m x [GroupRecord]
 groupSearch q =
   trace (\gr ->
     case length gr < 10 of
-      True -> "groupSearch: keyword \"" <> q <> "\" returnes: " <> Text.intercalate "," (map gr_name gr)
-      False -> "groupSearch: keyword \"" <> q <> "\" returnes: " <> tshow (length gr) <> " groups"
+      True -> "groupSearch: keyword \"" <> q <> "\" returns: " <> Text.intercalate "," (map gr_name gr)
+      False -> "groupSearch: keyword \"" <> q <> "\" returns: " <> tshow (length gr) <> " groups"
       ) $ do
   sortBy (compare `on` gr_members_count) <$> do
     m_items <$> do
@@ -93,6 +93,40 @@ groupSearch q =
         (\APIErrorRecord{..} ->
           case er_code of
             AccessDenied -> Right (Sized 0 [])
+            _ -> Left ""
+        )
+
+data UsersSearchArgs = UsersSearchArgs {
+    usa_q :: Text
+  , usa_city :: Maybe City
+  , usa_coid :: Maybe CountryId
+  , usa_sex :: Maybe Sex
+} deriving (Show)
+
+defaultUsersSearchArgs = UsersSearchArgs "" Nothing Nothing Nothing
+
+usersSearch :: (MonadAPI m x s) => UsersSearchArgs -> Integer -> API m x [UserRecord]
+usersSearch UsersSearchArgs{..} offset =
+  trace (\r ->
+    case length r < 10 of
+      True -> "usersSearch: keyword \"" <> usa_q <> "\" returns: " <> Text.intercalate "," (map ur_first_name r)
+      False -> "usersSearch: keyword \"" <> usa_q <> "\" returns: " <> tshow (length r) <> " users"
+      ) $ do
+    m_items <$> do
+      apiSimpleH "users.search"
+        ([("q",usa_q)
+         ,("fields", "can_post,members_count,city,country,education,sex,photo_50,photo_100,photo_200,photo_400_orig,photo_max")
+         ,("offset", tshow offset)
+         ,("count", tshow max_count)
+         ,("sort", "0") -- popularity
+         ] <> concat [
+            maybe [] ((:[]) . ("sex",) . tshow . sexId) usa_sex
+          , maybe [] ((:[]) . ("country",) . tshow . coid_id) usa_coid
+        ])
+        id
+        (\APIErrorRecord{..} ->
+          case er_code of
+            AccessDenied -> Right (mempty :: Sized [UserRecord])
             _ -> Left ""
         )
 
@@ -111,7 +145,7 @@ getCountries =
 getCities :: (MonadAPI m x s) => Country -> Maybe Text -> API m x (Sized [City])
 getCities Country{..} mq =
   apiSimple "database.getCities" $
-    [("country_id", tpack (show co_int)),
+    [("country_id", tshow $ coid_id $ co_coid),
      ("count", tpack (show max_count))
     ] ++
     maybe [] (\q -> [("q",q)]) mq

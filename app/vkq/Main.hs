@@ -311,7 +311,7 @@ cmd (DBQ go (DBOptions{..}))
     cs <- getCountries
 
     forM_ cs $ \Country{..} -> do
-      liftIO $ Text.putStrLn $ Text.concat [ tshow co_int, "\t",  co_title]
+      liftIO $ Text.putStrLn $ Text.concat [ tshow $ coid_id $ co_coid, "\t",  co_title]
 
   |db_cities = do
     error "not implemented"

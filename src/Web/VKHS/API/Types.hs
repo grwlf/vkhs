@@ -12,6 +12,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Web.VKHS.API.Types where
 
@@ -26,6 +27,15 @@ import Web.VKHS.Types
 import Web.VKHS.Imports
 
 import Web.VKHS.API.Base
+
+data APIUrl = APIUrl { aurl_str :: Text }
+  deriving(Show, Eq, Ord, Data, Typeable, Generic, Hashable)
+
+instance FromJSON APIUrl where
+  parseJSON j = APIUrl <$> Aeson.parseJSON j
+
+printAPIUrl :: APIUrl -> Text
+printAPIUrl APIUrl{..} = aurl_str
 
 {-# DEPRECATED SizedList "a) Use Sized instead. b) newer API verison may not need this" #-}
 data SizedList a = SizedList Int [a]
@@ -84,6 +94,21 @@ data UserId = UserId { uid_id :: Integer }
 instance FromJSON UserId where
   parseJSON j = UserId <$> (Aeson.parseJSON j)
 
+data Sex = Male | Female | Undefined
+  deriving(Show, Data, Eq, Ord, Typeable, Generic, Hashable)
+
+instance FromJSON Sex where
+  parseJSON j = do
+    Aeson.parseJSON j >>= \case
+      1 -> return Female
+      2 -> return Male
+      (_::Integer) -> return Undefined
+
+sexId :: Sex -> Integer
+sexId Male = 2
+sexId Female = 1
+sexId _ = 0
+
 data UserRecord = UserRecord
   { ur_uid :: UserId
   , ur_first_name :: Text
@@ -94,6 +119,12 @@ data UserRecord = UserRecord
   , ur_country :: Maybe Country
   , ur_bdate :: Maybe Text
   , ur_education :: Maybe Text
+  , ur_sex :: Maybe Sex
+  , ur_photo_50 :: Maybe APIUrl
+  , ur_photo_100 :: Maybe APIUrl
+  , ur_photo_200 :: Maybe APIUrl
+  , ur_photo_400_orig :: Maybe APIUrl
+  , ur_photo_max :: Maybe APIUrl
   -- , ur_photo :: String
   -- , ur_university :: Maybe Int
   -- , ur_university_name :: Maybe String
@@ -114,16 +145,25 @@ instance FromJSON UserRecord where
       <*> (o .:? "country")
       <*> (o .:? "bdate")
       <*> (o .:? "education")
+      <*> (o .:? "sex")
+      <*> (o .:? "photo_50")
+      <*> (o .:? "photo_100")
+      <*> (o .:? "photo_200")
+      <*> (o .:? "photo_400_orig")
+      <*> (o .:? "photo_max")
 
 printUserBio :: UserRecord -> Text
 printUserBio UserRecord{..} =
-  userUrl ur_uid <> " " <>
-  "name \""<> ur_first_name <> " " <> ur_last_name <> "\", " <>
-  "birth \"" <> (maybe "?" id ur_bdate) <> "\", " <>
+  printUserUrl ur_uid <> " " <>
+  "name \""<> ur_first_name <> " " <> ur_last_name <> "\" " <>
+  "birth \"" <> (maybe "?" id ur_bdate) <> "\" " <>
   "city \"" <> (maybe "?" (c_title) ur_city) <> "\""
 
-userUrl :: UserId -> Text
-userUrl (UserId x) = "https://vk.com/id" <> tshow x
+userUrl :: UserId -> APIUrl
+userUrl (UserId x) = APIUrl $ "https://vk.com/id" <> tshow x
+
+printUserUrl :: UserId -> Text
+printUserUrl (UserId x) = printAPIUrl $ APIUrl $ "https://vk.com/id" <> tshow x
 
 -- | Wall post representation (partial)
 --
@@ -153,7 +193,6 @@ instance FromJSON WallRecord where
 
 publishedAt :: WallRecord -> UTCTime
 publishedAt wr = posixSecondsToUTCTime $ fromIntegral $ wr_date wr
-
 
 data Sized a = Sized {
     m_count :: Int
@@ -208,9 +247,9 @@ data GroupRecord = GroupRecord {
   , gr_invited_by :: Maybe Int
   , gr_type :: GroupType
   , gr_has_photo :: Bool
-  , gr_photo_50 :: String
-  , gr_photo_100 :: String
-  , gr_photo_200 :: String
+  , gr_photo_50 :: Maybe APIUrl
+  , gr_photo_100 :: Maybe APIUrl
+  , gr_photo_200 :: Maybe APIUrl
   -- arbitrary fields
   , gr_can_post :: Maybe Bool
   , gr_members_count :: Maybe Int
@@ -231,21 +270,30 @@ instance FromJSON GroupRecord where
       <*> (o .:? "invited_by")
       <*> (o .: "type")
       <*> (o .:? "has_photo" .!= False)
-      <*> (o .: "photo_50")
-      <*> (o .: "photo_100")
-      <*> (o .: "photo_200")
+      <*> (o .:? "photo_50")
+      <*> (o .:? "photo_100")
+      <*> (o .:? "photo_200")
       <*> (fmap (==(1::Int)) <$> (o .:? "can_post"))
       <*> (o .:? "members_count")
 
-groupURL :: GroupRecord -> String
-groupURL GroupRecord{..} = "https://vk.com/" ++ urlify gr_type ++ (show $ gid_id $ gr_gid) where
+groupURL :: GroupRecord -> APIUrl
+groupURL GroupRecord{..} = APIUrl $ "https://vk.com/" <> urlify gr_type <> (tshow $ gid_id $ gr_gid) where
   urlify Group = "club"
   urlify Event = "event"
   urlify Public = "page"
 
+printGroupUrl :: GroupRecord -> Text
+printGroupUrl = printAPIUrl . groupURL
+
+data CountryId = CountryId {
+  coid_id :: Integer
+} deriving(Show,Data,Typeable,Generic,Hashable)
+
+instance FromJSON CountryId where
+  parseJSON j = CountryId <$> Aeson.parseJSON j
 
 data Country = Country {
-    co_int :: Integer
+    co_coid :: CountryId
   , co_title :: Text
 } deriving(Show,Data,Typeable)
 
