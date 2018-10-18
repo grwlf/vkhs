@@ -35,6 +35,7 @@ ToDo
 * Enhance the way `vkq` accepts arguments, support multy-line messages.
 * Grammatical mistakes. Any corrections will be kindly accepted.
 * Minor issues here and there. Use `git grep FIXME` to find them.
+* Write simple RSS-feeder server
 
 Installing
 ==========
