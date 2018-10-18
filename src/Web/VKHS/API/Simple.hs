@@ -50,6 +50,8 @@ max_count = 1000
 ver :: Text
 ver = "5.44"
 
+users_fields = "can_post,members_count,city,country,education,sex,photo_50,photo_100,photo_200,photo_400_orig,photo_max"
+
 -- | Versioned aliases for api caller functions
 -- apiSimpleF nm args f = apiRf nm (("v",ver):args) f
 apiSimple1 :: (MonadAPI m x s, FromJSON a) => MethodName -> [(String, Text)] -> API m x a
@@ -115,7 +117,7 @@ usersSearch UsersSearchArgs{..} offset =
     m_items <$> do
       apiSimpleH "users.search"
         ([("q",usa_q)
-         ,("fields", "can_post,members_count,city,country,education,sex,photo_50,photo_100,photo_200,photo_400_orig,photo_max")
+         ,("fields", users_fields)
          ,("offset", tshow offset)
          ,("count", tshow max_count)
          ,("sort", "0") -- popularity
@@ -247,7 +249,7 @@ getUsers [] = return []
 getUsers uids = do
   apiSimple "users.get" [
       ("user_ids", Text.intercalate "," [tshow x | UserId x <- uids])
-    , ("fields", "city,country,bdate,education")
+    , ("fields", users_fields)
     ]
 
 -- | Get current user
