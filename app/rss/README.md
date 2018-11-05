@@ -18,7 +18,7 @@ Minimal design
   - Vkontakte login credentials: username + password, other VKHS options via
     `--vkhs-options` option.
   - Vkontakte group ID to query posts from, See `GroupId`.
-* After lunch, application should convert Group posts to RSS entries of the feed
+* After launch, application should convert Group posts to RSS entries of the feed
   and print resulting XML to the stdout.
 * Nix should be used to wrap the application into intetd-like service.
 
