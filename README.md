@@ -19,26 +19,30 @@ Features
   copied into `runhaskell` scripts and tweaked according to ones need.
 * No more dependencies on curlhs/taglib.
 
-ToDo
+TODO
 ----
 
 * ~~Decrypt 'RepeatedForm' errors~~
 * ~~Support storing access-tokens in a temp file~~
 * ~~Still no support for captchas, one probably should hack `defaultSupervisor`
   and add them.~~
+* ~~File uploading still not functioning.~~
+* Preserve cookies between sessions
 * Make user-friendly multy-platform captcha display.
 * Fix login automata behaviour regarding captcha failures.
+* Re-test existing captcha-related functionality
 * Re-implement VK monad as a Free monad special case.
 * Runhaskell: handle some standard command line arguments.
-* ~~File uploading still not functioning.~~
 * Network connection timeout is not handled by the coroutine supervisor.
 * Enhance the way `vkq` accepts arguments, support multy-line messages.
-* Grammatical mistakes. Any corrections will be kindly accepted.
+* Fix grammatical mistakes here and there. Any corrections will be kindly accepted.
 * Minor issues here and there. Use `git grep FIXME` to find them.
-* Write simple RSS-feeder server
+* Write simple RSS-feeder server, see [specs](./app/rss/README.md)
 
 Installing
 ==========
+
+TODO: Drop a note about Stack
 
 Installing from Hackage
 -----------------------
@@ -63,6 +67,8 @@ The author of this project uses [Nix](http://nixos.org) as a main development
 platform. The `default.nix` file contain Nix expression describing the environment
 
 #### Developing via Nix shell environment
+
+TODO: Check and document the usage of `cabal repl` with this package
 
     $ git clone https://github.com/grwlf/vkhs
     $ cd vkhs
@@ -89,7 +95,6 @@ text editors. The script uses `hasktags` via `haskdogs` tools, available on
 Hackage.
 
     $ haskdogs
-
 
 
 VKQ command line application
@@ -221,5 +226,5 @@ License
 
 BSD3 license
 
-Copyright (c) 2014, Sergey Mironov <grrwlf@gmail.com>
+Copyright (c) 2018, Sergey Mironov <grrwlf@gmail.com>
 
