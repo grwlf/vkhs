@@ -9,15 +9,14 @@ token, it is possible to call VK API methods.
 Features
 --------
 
-* Provides access to VK API. Interface options include: VK monad and `vkq` command
-  line tool.
-* Uses HTTPS protocol.
-* Solves login form interaction, may be used to operate new/disposable VK accounts.
-* VK monad is designed as an interruptable coroutine. The supervisor supports
-  ondemand re-login, and may be used for long-running tasks.
-* Project includes a set of `Web.VKHS.API.Simple` wrappers designed to be
-  copied into `runhaskell` scripts and tweaked according to ones need.
-* No more dependencies on curlhs/taglib.
+* Provides access to VK API via `VKT` monad and `vkq` command line tool.
+* Supports HTTPS protocol.
+* Supports `http_proxy` variables.
+* Handles interaction with VK Login form.
+* `VKT` monad is designed to handle long-running tasks and allows programs to recover
+  from errors like network errors or token expirations.
+* [Web.VKHS.API.Simple](./src/Web/VKHS/API/Simple.hs) module defines handy API wrappers.
+  See example [`runhaskell` scripts](./app/runhaskell).
 
 TODO
 ----
