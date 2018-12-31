@@ -67,6 +67,8 @@ library
                      pretty-show,
                      scientific,
                      text,
+                     hashable,
+                     flippers,
                      regexpr
   ghc-options: -Wall -Wno-unused-imports -Wno-unused-matches
 
