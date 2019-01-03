@@ -147,7 +147,7 @@ urlFragments URL{..} = splitFragments "&" "=" $  unsharp $ Client.uriFragment ur
 -}
 
 data Cookies = Cookies { jar :: Client.CookieJar }
-  deriving(Show,Eq)
+  deriving(Show, Read, Eq)
 
 cookiesCreate :: () -> Cookies
 cookiesCreate () = Cookies (Client.createCookieJar [])

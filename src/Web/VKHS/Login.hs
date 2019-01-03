@@ -27,6 +27,7 @@ import Data.ByteString.Char8 (ByteString)
 import Data.Text(Text)
 import Debug.Trace
 import System.IO
+import System.Directory (doesFileExist)
 
 import Web.VKHS.Types
 import Web.VKHS.Client (ToClientState(..), ClientState(..), MonadClient,
@@ -55,6 +56,8 @@ data LoginState = LoginState {
   -- ^ Dictionary containig inputID/value map for filling forms
   , ls_touched_inputs :: Set String -- [[String]]
   -- ^ Input fields that was once set explicitly
+  , ls_cookies :: Cookies
+  -- ^ Cookies of the session
   }
 
 defaultLoginState :: GenericOptions -> LoginState
@@ -65,6 +68,7 @@ defaultLoginState go@GenericOptions{..} =
   , ls_formdata = (if not (null l_username) then [("email", l_username)] else [])
                ++ (if not (null l_password) then [("pass", l_password)] else [])
   , ls_touched_inputs = Set.fromList []
+  , ls_cookies = Cookies mempty
   }
 
 class (ToGenericOptions s) => ToLoginState s where
@@ -117,7 +121,12 @@ initialAction = do
             , ("display", "wap")
             , ("response_type", "token")
             ])
-  return (DoGET u (cookiesCreate ()))
+  cookies <- liftIO $ do
+    c <- doesFileExist l_cookies_file
+    if c then read <$> readFile l_cookies_file
+         else pure $ Cookies mempty
+  modifyVKState (modifyLoginState (\s -> s{ls_cookies = cookies}))
+  return (DoGET u cookies)
 
 printForm :: String -> Shpider.Form -> Text
 printForm prefix Shpider.Form{..} =
@@ -165,6 +174,7 @@ fillForm tags f@(Form{..}) = do
 actionRequest :: (MonadLogin m x s) => RobotAction -> Login m x (ClientResponse, Cookies)
 actionRequest ra = do
   (res, jar') <- raiseVK (LoginRequestExecute ra)
+  modifyVKState (modifyLoginState (\s -> s{ls_cookies = jar'}))
   return (res, jar')
 
 analyzeResponse :: (MonadLogin m x s) => (ClientResponse, Cookies) -> Login m x (Either RobotAction AccessToken)
@@ -200,11 +210,14 @@ analyzeResponse (res, jar) = do
           terminate $ LoginFailed $ LoginNoAction
 
 loginRoutine :: (MonadLogin m x s) => Login m x AccessToken
-loginRoutine = initialAction >>= go where
+loginRoutine = (initialAction >>= go) <* saveCookies where
   go a = do
     req <- actionRequest a
     res <- analyzeResponse req
     case res of
       Left a' -> go a'
       Right at -> return at
-
+  saveCookies = do
+    cookies_file <- l_cookies_file <$> toGenericOptions <$> getVKState
+    cookies <- ls_cookies <$> toLoginState <$> getVKState
+    liftIO $ writeFile cookies_file $ show cookies
