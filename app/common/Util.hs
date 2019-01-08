@@ -48,7 +48,7 @@ gr_tags = [
   , ('m', maybe "?" show . gr_members_count)
   , ('n', namefilter . Text.unpack . gr_name)
   , ('s', namefilter . Text.unpack . gr_screen_name)
-  , ('u', groupURL)
+  , ('u', Text.unpack . aurl_str . groupURL)
   ]
 
 gr_format :: String -> GroupRecord -> String
