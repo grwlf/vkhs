@@ -160,7 +160,8 @@ data GenericOptions = GenericOptions {
   -- ^ Filename to store actual access token, should be used to pass its value
   -- between sessions
   , l_cookies_file :: FilePath
-  -- ^ File to load/save cookies for storing them between program runs
+  -- ^ File to load/save cookies for storing them between program runs. Empty
+  -- means 'not set.'
   -- , l_api_cache_time :: DiffTime
   } deriving(Show)
 

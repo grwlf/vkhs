@@ -121,10 +121,12 @@ initialAction = do
             , ("display", "wap")
             , ("response_type", "token")
             ])
-  cookies <- liftIO $ do
-    c <- doesFileExist l_cookies_file
-    if c then read <$> readFile l_cookies_file
-         else pure $ Cookies mempty
+  cookies <- if null l_cookies_file
+             then pure $ Cookies mempty
+             else liftIO $ do
+               c <- doesFileExist l_cookies_file
+               if c then read <$> readFile l_cookies_file
+                    else pure $ Cookies mempty
   modifyVKState (modifyLoginState (\s -> s{ls_cookies = cookies}))
   return (DoGET u cookies)
 
@@ -220,4 +222,5 @@ loginRoutine = (initialAction >>= go) <* saveCookies where
   saveCookies = do
     cookies_file <- l_cookies_file <$> toGenericOptions <$> getVKState
     cookies <- ls_cookies <$> toLoginState <$> getVKState
-    liftIO $ writeFile cookies_file $ show cookies
+    when (not $ null cookies_file) $
+      liftIO $ writeFile cookies_file $ show cookies
