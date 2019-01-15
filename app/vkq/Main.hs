@@ -144,6 +144,8 @@ optdesc m =
               help ("Access token. Honores " ++ env_access_token ++ " environment variable"))
         <*> strOption (long "access-token-file" <> value (l_access_token_file defaultOptions) <> metavar "FILE" <>
               help ("Filename to store actual access token, should be used to pass its value between sessions"))
+        <*> strOption (long "cookies-file" <> value (l_cookies_file defaultOptions) <> metavar "FILE" <>
+              help "Filename to stote cookies, should be used to store cookies between sessions")
 
       genericOptions = genericOptions_
         (strOption (value "" <> long "user" <> metavar "USER" <> help "User name or email"))
