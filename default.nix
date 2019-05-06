@@ -1,5 +1,5 @@
 { nixpkgs ? import <nixpkgs> {},
-  ghc ? "ghc822",
+  ghc ? "ghc844",
   force_build ? false }:
 
 let
@@ -16,7 +16,7 @@ let
       }:
       mkDerivation {
         pname = "VKHS";
-        version = "1.9.1";
+        version = "1.9.2";
         src = ./.;
         isLibrary = true;
         isExecutable = true;
@@ -41,7 +41,8 @@ let
             . /etc/myprofile
           fi
           export LIBRARY_PATH=${pkgs.zlib}/lib:${pkgs.taglib}/lib
-          cabal() {( `which cabal` --ghc-options=-freverse-errors "$@" ; )}
+          build() {( cabal --ghc-options=-freverse-errors build "$@" ; )}
+          repl() {( cabal --ghc-options=-freverse-errors repl "$@" ; )}
         '';
       };
 

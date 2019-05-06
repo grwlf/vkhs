@@ -41,49 +41,63 @@ TODO
 Installing
 ==========
 
-TODO: Drop a note about Stack
+The author of this project uses [Nix](http://nixos.org/nix) package manager for
+maintaining development environment. The `default.nix` file contains Nix
+expression describing the environment and a tree of dependencies.
+
+Non-nix installations are possible, but this way requires user to install the
+right Cabal and GHC versions. The GHC version which is known to work is listed
+in `default.nix` file of the current repo.
+
+    $ cat ./default.nix | grep "ghc ?"
+       ghc ? "ghc844"
+
+means that the author used `GHC-8.4.4` to build the package.
+
+Installing with Nix
+-------------------
+
+1. Make sure that [Nix](http://nixos.org/nix) package manager is installed.
+   NixOS distribution has it by default, other distros may install it
+   as a regular application.
+2. Check that `NIX_PATH` variable is set, and its `nixpkg` section points to
+   recent `nixpkgs` repository. The `8916ac0` revision of `release-19.03` branch
+   is known to work.
+3. Do the following:
+   ```
+   $ git clone https://github.com/grwlf/vkhs
+   $ cd vkhs
+   $ nix-shell
+
+     ... Wait until dependencies are fetched
+
+   (shell) $ cabal repl vkq
+   > :lo Main
+   > :main --help
+   > ...
+
+   (shell) $ cabal build
+   ```
 
 Installing from Hackage
 -----------------------
 
-In order to install VKHS, one typically should do the following
+To install VKHS as a library, one typically should use the Cabal
+package manager of Haskell, as follows:
 
     $ cabal update
     $ cabal install VKHS
 
+Note, that Hackage may contain slightly outdated version of VKHS.
 
 Installing from source
 ----------------------
 
-    $ git clone https://github.com/grwlf/vkhs
-    $ cd vkhs
-    $ cabal install
-
-Developing using Nix
---------------------
-
-The author of this project uses [Nix](http://nixos.org) as a main development
-platform. The `default.nix` file contain Nix expression describing the environment
-
-#### Developing via Nix shell environment
-
-TODO: Check and document the usage of `cabal repl` with this package
+To install from source, one typically need to install HaskellPlatform of the
+right version and do the following:
 
     $ git clone https://github.com/grwlf/vkhs
     $ cd vkhs
-    $ nix-shell         # Entering NIX development shell
-    # ./ghci.sh         # GHCI wrapper script
-    > :lo Main          # Usual development
-    > ^D
-    # cabal install     # Shell provides access to cabal
-    # cabal sdist
-    # ^D
-    $ ...
-
-#### Usual development
-
-    $ ghci -isrc:app/vkq:app/common
-    $ ^D
     $ cabal install
 
 Building ctags file
@@ -94,7 +108,6 @@ text editors. The script uses `hasktags` via `haskdogs` tools, available on
 Hackage.
 
     $ haskdogs
-
 
 VKQ command line application
 ============================
