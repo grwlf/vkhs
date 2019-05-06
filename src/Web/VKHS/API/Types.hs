@@ -203,6 +203,9 @@ instance FromJSON a => FromJSON (Sized a) where
   parseJSON = Aeson.withObject "Result" (\o ->
     Sized <$> o .: "count" <*> o .: "items")
 
+instance Semigroup a => Semigroup (Sized a) where
+  (<>) (Sized x a) (Sized y b) = Sized (x+y) (a<>b)
+
 instance Monoid a => Monoid (Sized a) where
   mempty = Sized 0 mempty
   mappend (Sized x a) (Sized y b) = Sized (x+y) (a<>b)
